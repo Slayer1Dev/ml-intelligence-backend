@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calculadora de Lucro — ML Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+  <style>
+    .calc-form { max-width: 500px; }
+    button.calc {
+      width: 100%;
+      padding: 1rem;
+      background: var(--yellow);
+      color: var(--black);
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    button.calc:hover {
+      background: var(--yellow-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+    }
+    .result {
+      display: none;
+      padding: 1.5rem;
+      background: linear-gradient(135deg, rgba(30, 64, 175, 0.05) 0%, rgba(251, 191, 36, 0.1) 100%);
+      border: 1px solid rgba(30, 64, 175, 0.15);
+      border-radius: 12px;
+      margin-top: 1.5rem;
+    }
+    .result.visible { display: block; }
+    .result h3 { font-size: 0.9rem; color: var(--gray); margin-bottom: 0.5rem; }
+    .result .lucro { font-size: 2rem; font-weight: 700; color: var(--blue-primary); margin-bottom: 0.25rem; }
+    .result .margem { font-size: 1.1rem; color: var(--black); }
+    .result .despesas { font-size: 0.85rem; color: var(--gray); margin-top: 0.75rem; }
+    .result.negative .lucro { color: #dc2626; }
+    .error { color: #dc2626; font-size: 0.9rem; margin-top: 1rem; display: none; }
+    .error.visible { display: block; }
+  </style>
+</head>
+<body class="app">
+  <header class="app-header">
+    <a href="dashboard.html" class="app-logo">ML Intelligence</a>
+    <span class="app-user">Ola, vendedor</span>
+  </header>
+
+  <div class="app-body">
+    <aside class="app-sidebar">
+      <nav>
+        <a href="dashboard.html">Resumo</a>
+        <a href="financeiro.html">Painel Financeiro</a>
+        <a href="calculator.html" class="active">Calculadora de Lucro</a>
+        <a href="anuncios.html">Meus Anuncios</a>
+        <a href="performance.html">Performance</a>
+        <a href="concorrentes.html">Concorrentes</a>
+      </nav>
+    </aside>
+
+    <main class="app-main">
+      <h1>Calculadora de Lucro</h1>
+      <p class="subtitle">Veja quanto sobra de cada venda apos custos, taxa ML, frete e impostos.</p>
+
+      <div class="card calc-form">
+        <form id="form">
+          <div class="form-group">
+            <label>Custo do produto (R$)</label>
+            <input type="text" inputmode="decimal" id="custo" placeholder="Ex: 50,00 ou 50.00" required>
+          </div>
+          <div class="form-group">
+            <label>Preco de venda (R$)</label>
+            <input type="text" inputmode="decimal" id="preco" placeholder="Ex: 120,00 ou 120.00" required>
+          </div>
+          <div class="form-group">
+            <label>Frete estimado (R$)</label>
+            <input type="text" inputmode="decimal" id="frete" value="20" placeholder="Ex: 20,00 ou 20.00">
+          </div>
+          <div class="form-group">
+            <label>Taxa ML (%)</label>
+            <input type="number" id="taxa" step="0.1" value="11" placeholder="Ex: 11">
+          </div>
+          <div class="form-group">
+            <label>Imposto (%)</label>
+            <input type="number" id="imposto" step="0.1" value="5" placeholder="Ex: 5">
+          </div>
+          <button type="submit" class="calc">Calcular lucro</button>
+        </form>
+
+        <div id="result" class="result">
+          <h3>Seu lucro por unidade</h3>
+          <div class="lucro" id="lucro">R$ 0,00</div>
+          <div class="margem" id="margem">Margem: 0%</div>
+          <div class="despesas" id="despesas"></div>
+        </div>
+
+        <div id="error" class="error"></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const API_URL = 'http://127.0.0.1:8000';
+
+    function parseNum(val) {
+      if (!val || val === '') return NaN;
+      const s = String(val).trim().replace(',', '.');
+      return parseFloat(s) || NaN;
+    }
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const resultEl = document.getElementById('result');
+      const errorEl = document.getElementById('error');
+      resultEl.classList.remove('visible', 'negative');
+      errorEl.classList.remove('visible');
+
+      const custo = parseNum(document.getElementById('custo').value);
+      const preco = parseNum(document.getElementById('preco').value);
+      const frete = parseNum(document.getElementById('frete').value) || 20;
+      const taxa = parseNum(document.getElementById('taxa').value) || 11;
+      const imposto = parseNum(document.getElementById('imposto').value) || 5;
+
+      if (isNaN(custo) || isNaN(preco)) {
+        errorEl.textContent = 'Informe custo e preco de venda com numeros (use virgula ou ponto).';
+        errorEl.classList.add('visible');
+        return;
+      }
+
+      const data = {
+        custo_produto: custo,
+        preco_venda: preco,
+        frete,
+        taxa_percentual: taxa,
+        imposto_percentual: imposto,
+      };
+
+      try {
+        const res = await fetch(`${API_URL}/api/calculate-profit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const json = await res.json();
+
+        if (!res.ok) {
+          throw new Error(json.detail || 'Erro ao calcular');
+        }
+
+        const lucro = json.lucro_unitario;
+        document.getElementById('lucro').textContent = `R$ ${lucro.toFixed(2).replace('.', ',')}`;
+        document.getElementById('margem').textContent = `Margem: ${json.margem_percentual.toFixed(1)}%`;
+        document.getElementById('despesas').textContent = `Total em despesas (taxa + imposto + frete): R$ ${json.total_despesas?.toFixed(2).replace('.', ',') || '—'}`;
+
+        if (lucro < 0) resultEl.classList.add('negative');
+        resultEl.classList.add('visible');
+      } catch (err) {
+        errorEl.textContent = 'Nao foi possivel conectar ao servidor. Certifique-se de que o backend esta rodando.';
+        errorEl.classList.add('visible');
+      }
+    });
+  </script>
+</body>
+</html>

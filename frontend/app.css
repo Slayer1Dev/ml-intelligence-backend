@@ -1,0 +1,328 @@
+/* =====================================================
+   ML INTELLIGENCE — DESIGN SYSTEM
+   Paleta: Azul + Amarelo + Preto + Branco
+   ===================================================== */
+
+:root {
+  /* Cores principais */
+  --blue-primary: #1e40af;
+  --blue-dark: #1e3a8a;
+  --blue-light: #dbeafe;
+  --blue-sky: #bfdbfe;
+  --yellow: #fbbf24;
+  --yellow-hover: #f59e0b;
+  --black: #0f172a;
+  --gray: #475569;
+  --gray-light: #94a3b8;
+  --white: #ffffff;
+
+  /* Aliases para o app */
+  --bg-app: var(--blue-light);
+  --bg-sidebar: var(--white);
+  --bg-card: var(--white);
+  --accent: var(--yellow);
+  --accent-hover: var(--yellow-hover);
+  --text: var(--black);
+  --text-muted: var(--gray);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ===================== APP SHELL ===================== */
+.app {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: linear-gradient(180deg, var(--blue-light) 0%, var(--white) 100%);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===================== HEADER ===================== */
+.app-header {
+  height: 60px;
+  background: var(--white);
+  border-bottom: 1px solid rgba(30, 64, 175, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.app-logo {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--blue-primary);
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.app-logo:hover { opacity: 0.8; }
+
+.app-user {
+  font-size: 0.85rem;
+  color: var(--gray);
+}
+
+/* ===================== BODY ===================== */
+.app-body {
+  display: flex;
+  flex: 1;
+  min-height: calc(100vh - 60px);
+}
+
+/* ===================== SIDEBAR ===================== */
+.app-sidebar {
+  width: 240px;
+  background: var(--white);
+  border-right: 1px solid rgba(30, 64, 175, 0.1);
+  padding: 1.5rem 0;
+  flex-shrink: 0;
+}
+
+.app-sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.app-sidebar a {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  color: var(--gray);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.15s;
+  border-left: 3px solid transparent;
+}
+
+.app-sidebar a:hover {
+  color: var(--blue-primary);
+  background: var(--blue-light);
+}
+
+.app-sidebar a.active {
+  color: var(--blue-primary);
+  background: var(--blue-light);
+  border-left-color: var(--yellow);
+  font-weight: 600;
+}
+
+/* ===================== MAIN ===================== */
+.app-main {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+  background: linear-gradient(180deg, rgba(219, 234, 254, 0.3) 0%, var(--white) 100%);
+}
+
+.app-main h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--black);
+  margin-bottom: 0.5rem;
+}
+
+.app-main .subtitle {
+  color: var(--gray);
+  font-size: 1rem;
+  margin-bottom: 2rem;
+}
+
+/* ===================== CARDS ===================== */
+.card {
+  background: var(--white);
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid rgba(30, 64, 175, 0.08);
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.04);
+  transition: all 0.2s;
+}
+
+.card:hover {
+  box-shadow: 0 4px 16px rgba(30, 64, 175, 0.08);
+}
+
+.card-link {
+  display: block;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.card-link:hover {
+  border-color: var(--yellow);
+}
+
+.card h3, .card strong {
+  color: var(--blue-primary);
+}
+
+.card p {
+  color: var(--gray);
+}
+
+/* ===================== GRID ===================== */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+/* ===================== TABLES ===================== */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid rgba(30, 64, 175, 0.08);
+}
+
+.table th {
+  color: var(--blue-primary);
+  font-weight: 600;
+}
+
+.table td {
+  color: var(--gray);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+/* ===================== BUTTONS ===================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 1rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-primary {
+  background: var(--yellow);
+  color: var(--black);
+}
+
+.btn-primary:hover {
+  background: var(--yellow-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+}
+
+.btn-secondary {
+  background: var(--blue-light);
+  color: var(--blue-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--blue-sky);
+}
+
+/* ===================== FORMS ===================== */
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 0.4rem;
+  color: var(--gray);
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(30, 64, 175, 0.2);
+  background: var(--white);
+  color: var(--black);
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--blue-primary);
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+
+/* ===================== COMING SOON ===================== */
+.coming-soon {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--gray);
+}
+
+.coming-soon h2 {
+  font-size: 1.25rem;
+  color: var(--black);
+  margin-bottom: 0.75rem;
+}
+
+.coming-soon p {
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
+.feature-list {
+  text-align: left;
+  max-width: 400px;
+  margin: 1.5rem auto 0;
+  list-style: none;
+}
+
+.feature-list li {
+  margin: 0.75rem 0;
+  color: var(--gray);
+  padding-left: 1.5rem;
+  position: relative;
+}
+
+.feature-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  width: 8px;
+  height: 8px;
+  background: var(--yellow);
+  border-radius: 50%;
+}
+
+/* ===================== RESPONSIVE ===================== */
+@media (max-width: 768px) {
+  .app-sidebar {
+    display: none;
+  }
+
+  .app-main {
+    padding: 1.5rem;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

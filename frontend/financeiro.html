@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel Financeiro — ML Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+  <style>
+    .upload-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+    }
+    .metric-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--blue-primary);
+      margin-top: 0.25rem;
+    }
+    .metric-label {
+      color: var(--gray);
+      font-size: 0.9rem;
+    }
+    .chart-card {
+      padding: 1.5rem;
+    }
+  </style>
+</head>
+<body class="app">
+  <header class="app-header">
+    <a href="dashboard.html" class="app-logo">ML Intelligence</a>
+    <span class="app-user">Ola, vendedor</span>
+  </header>
+
+  <div class="app-body">
+    <aside class="app-sidebar">
+      <nav>
+        <a href="dashboard.html">Resumo</a>
+        <a href="financeiro.html" class="active">Painel Financeiro</a>
+        <a href="calculator.html">Calculadora de Lucro</a>
+        <a href="anuncios.html">Meus Anuncios</a>
+        <a href="performance.html">Performance</a>
+        <a href="concorrentes.html">Concorrentes</a>
+      </nav>
+    </aside>
+
+    <main class="app-main">
+      <h1>Painel Financeiro</h1>
+      <p class="subtitle">Gere indicadores financeiros a partir da planilha do Mercado Livre.</p>
+
+      <div class="card">
+        <h3 style="margin-bottom: 1rem; color: var(--blue-primary);">Importar dados</h3>
+        <form id="financeForm" class="upload-grid">
+          <div class="form-group">
+            <label>Planilha do Mercado Livre (XLSX)</label>
+            <input type="file" id="mlFile" accept=".xlsx" required>
+          </div>
+          <div class="form-group">
+            <label>Planilha de custos (opcional)</label>
+            <input type="file" id="costFile" accept=".xlsx,.csv">
+          </div>
+          <div class="form-group">
+            <label>Embalagem (R$)</label>
+            <input type="text" inputmode="decimal" id="embalagem" value="1">
+          </div>
+          <div class="form-group">
+            <label>Frete (R$)</label>
+            <input type="text" inputmode="decimal" id="frete" value="0">
+          </div>
+          <div class="form-group" style="align-self: end;">
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Gerar Painel</button>
+          </div>
+        </form>
+        <p id="financeError" style="margin-top: 1rem; color: #dc2626; display: none;"></p>
+      </div>
+
+      <div id="metricsSection" style="display: none;">
+        <div class="grid">
+          <div class="card">
+            <div class="metric-label">Anuncios totais</div>
+            <div class="metric-value" id="metricTotal">-</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Anuncios ativos</div>
+            <div class="metric-value" id="metricActive">-</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Estoque total</div>
+            <div class="metric-value" id="metricStock">-</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Preco medio (R$)</div>
+            <div class="metric-value" id="metricPrice">-</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Taxa media (%)</div>
+            <div class="metric-value" id="metricFee">-</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Lucro medio (R$)</div>
+            <div class="metric-value" id="metricProfitMean">-</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Margem media (%)</div>
+            <div class="metric-value" id="metricMarginMean">-</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Lucro total (R$)</div>
+            <div class="metric-value" id="metricProfitTotal">-</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Itens sem custo</div>
+            <div class="metric-value" id="metricMissingCost">-</div>
+          </div>
+        </div>
+
+        <div class="card chart-card" style="margin-top: 1.5rem;">
+          <h3 style="margin-bottom: 1rem; color: var(--blue-primary);">Top 10 por lucro</h3>
+          <canvas id="profitChart" height="120"></canvas>
+        </div>
+
+        <div class="card" style="margin-top: 1.5rem;">
+          <h3 style="margin-bottom: 1rem; color: var(--blue-primary);">Ranking de lucro</h3>
+          <div class="table-wrap">
+            <table class="table" id="profitTable">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Titulo</th>
+                  <th>Preco</th>
+                  <th>Lucro (R$)</th>
+                  <th>Margem (%)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const API_URL = 'http://127.0.0.1:8000';
+    let chart;
+
+    function parseNum(val) {
+      if (!val) return 0;
+      const s = String(val).trim().replace(',', '.');
+      return parseFloat(s) || 0;
+    }
+
+    function setText(id, value) {
+      document.getElementById(id).textContent = value;
+    }
+
+    document.getElementById('financeForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('financeError');
+      err.style.display = 'none';
+
+      const mlFile = document.getElementById('mlFile').files[0];
+      if (!mlFile) {
+        err.textContent = 'Envie a planilha do Mercado Livre.';
+        err.style.display = 'block';
+        return;
+      }
+
+      const form = new FormData();
+      form.append('file', mlFile);
+
+      const costFile = document.getElementById('costFile').files[0];
+      if (costFile) form.append('costs_file', costFile);
+
+      form.append('embalagem', parseNum(document.getElementById('embalagem').value));
+      form.append('frete', parseNum(document.getElementById('frete').value));
+
+      try {
+        const res = await fetch(`${API_URL}/api/financial-dashboard`, {
+          method: 'POST',
+          body: form
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || 'Erro ao gerar painel.');
+        }
+
+        const m = data.metrics;
+        setText('metricTotal', m.total_listings);
+        setText('metricActive', m.active_listings);
+        setText('metricStock', m.total_stock);
+        setText('metricPrice', `R$ ${m.avg_price.toFixed(2).replace('.', ',')}`);
+        setText('metricFee', `${m.avg_fee_pct.toFixed(2)}%`);
+        setText('metricProfitMean', `R$ ${m.profit_mean.toFixed(2).replace('.', ',')}`);
+        setText('metricMarginMean', `${m.margin_mean.toFixed(2)}%`);
+        setText('metricProfitTotal', `R$ ${m.profit_total.toFixed(2).replace('.', ',')}`);
+        setText('metricMissingCost', m.missing_cost);
+
+        const tbody = document.querySelector('#profitTable tbody');
+        tbody.innerHTML = '';
+        (data.top_profit || []).forEach(row => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${row.SKU_STR || '-'}</td>
+            <td>${row.TITLE || '-'}</td>
+            <td>R$ ${(row.PRICE_NUM || 0).toFixed(2).replace('.', ',')}</td>
+            <td>R$ ${(row.PROFIT || 0).toFixed(2).replace('.', ',')}</td>
+            <td>${(row.MARGIN_PCT || 0).toFixed(2)}%</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        const labels = (data.top_profit || []).map(r => r.SKU_STR || r.ITEM_ID);
+        const values = (data.top_profit || []).map(r => r.PROFIT || 0);
+
+        const ctx = document.getElementById('profitChart').getContext('2d');
+        if (chart) chart.destroy();
+        chart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Lucro (R$)',
+              data: values,
+              backgroundColor: '#1e40af'
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { display: false }
+            },
+            scales: {
+              y: {
+                ticks: {
+                  callback: (value) => `R$ ${value}`
+                }
+              }
+            }
+          }
+        });
+
+        document.getElementById('metricsSection').style.display = 'block';
+      } catch (error) {
+        err.textContent = error.message || 'Falha ao gerar painel.';
+        err.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

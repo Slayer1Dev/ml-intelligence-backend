@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Logs</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Logs do sistema</h1>
+  <pre id="logs"></pre>
+
+  <script>
+    async function carregarLogs(){
+      const res = await fetch("http://127.0.0.1:8000/logs");
+      const texto = await res.text();
+      document.getElementById("logs").innerText = texto;
+    }
+
+    carregarLogs();
+  </script>
+</body>
+</html>

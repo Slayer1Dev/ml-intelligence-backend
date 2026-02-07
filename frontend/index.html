@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ML Intelligence — Ferramentas para seu E-commerce</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --blue-primary: #1e40af;
+      --blue-dark: #1e3a8a;
+      --blue-light: #dbeafe;
+      --blue-sky: #bfdbfe;
+      --yellow: #fbbf24;
+      --yellow-hover: #f59e0b;
+      --black: #0f172a;
+      --gray: #475569;
+      --gray-light: #94a3b8;
+      --white: #ffffff;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: linear-gradient(180deg, var(--blue-light) 0%, var(--white) 50%);
+      color: var(--black);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ===================== NAVBAR ===================== */
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: rgba(255,255,255,0.9);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(30, 64, 175, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      z-index: 1000;
+    }
+
+    .navbar-logo {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--blue-primary);
+      text-decoration: none;
+    }
+
+    .navbar-cta {
+      background: var(--yellow);
+      color: var(--black);
+      font-weight: 600;
+      padding: 0.6rem 1.5rem;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .navbar-cta:hover {
+      background: var(--yellow-hover);
+      transform: translateY(-1px);
+    }
+
+    /* ===================== HERO ===================== */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 6rem 2rem 4rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .hero-circle {
+      position: absolute;
+      border-radius: 50%;
+      opacity: 0.15;
+    }
+
+    .hero-circle-1 {
+      width: 600px;
+      height: 600px;
+      background: var(--blue-primary);
+      top: -200px;
+      right: -200px;
+    }
+
+    .hero-circle-2 {
+      width: 400px;
+      height: 400px;
+      background: var(--yellow);
+      bottom: -100px;
+      left: -100px;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      max-width: 800px;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      background: rgba(30, 64, 175, 0.1);
+      color: var(--blue-primary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0.4rem 1rem;
+      border-radius: 20px;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-title {
+      font-size: 3.5rem;
+      font-weight: 800;
+      color: var(--black);
+      margin-bottom: 1.5rem;
+      line-height: 1.1;
+    }
+
+    .hero-title span {
+      color: var(--blue-primary);
+    }
+
+    .hero-subtitle {
+      font-size: 1.25rem;
+      color: var(--gray);
+      max-width: 600px;
+      margin: 0 auto 2.5rem;
+    }
+
+    .hero-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--yellow);
+      color: var(--black);
+      font-weight: 700;
+      font-size: 1.1rem;
+      padding: 1rem 2.5rem;
+      border-radius: 12px;
+      text-decoration: none;
+      transition: all 0.25s;
+      box-shadow: 0 4px 20px rgba(251, 191, 36, 0.4);
+    }
+
+    .hero-cta:hover {
+      background: var(--yellow-hover);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 30px rgba(251, 191, 36, 0.5);
+    }
+
+    /* ===================== SOCIAL PROOF ===================== */
+    .social-proof {
+      padding: 4rem 2rem;
+      text-align: center;
+      background: var(--white);
+    }
+
+    .social-proof-label {
+      font-size: 0.9rem;
+      color: var(--gray-light);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 2rem;
+    }
+
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 4rem;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-number {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--blue-primary);
+    }
+
+    .stat-label {
+      font-size: 0.95rem;
+      color: var(--gray);
+    }
+
+    /* ===================== ABOUT ===================== */
+    .about {
+      padding: 5rem 2rem;
+      text-align: center;
+      background: linear-gradient(180deg, var(--white) 0%, var(--blue-light) 100%);
+    }
+
+    .about-content {
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .section-title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--black);
+      margin-bottom: 1rem;
+    }
+
+    .section-subtitle {
+      font-size: 1.1rem;
+      color: var(--gray);
+      line-height: 1.7;
+    }
+
+    /* ===================== FEATURES ===================== */
+    .features {
+      padding: 4rem 2rem;
+      background: linear-gradient(180deg, var(--blue-light) 0%, var(--white) 100%);
+    }
+
+    .features-header {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+
+    .feature-section {
+      display: flex;
+      align-items: center;
+      gap: 4rem;
+      max-width: 1100px;
+      margin: 0 auto 5rem;
+      padding: 0 1rem;
+      opacity: 0;
+      transform: translateY(40px);
+      transition: all 0.6s ease-out;
+    }
+
+    .feature-section.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .feature-section:nth-child(even) {
+      flex-direction: row-reverse;
+    }
+
+    .feature-visual {
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .feature-icon-box {
+      width: 100%;
+      aspect-ratio: 4/3;
+      background: var(--white);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 5rem;
+      box-shadow: 0 10px 40px rgba(30, 64, 175, 0.1);
+      border: 1px solid rgba(30, 64, 175, 0.08);
+    }
+
+    .feature-text {
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .feature-tag {
+      display: inline-block;
+      background: rgba(251, 191, 36, 0.2);
+      color: var(--yellow-hover);
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 0.3rem 0.8rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .feature-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--black);
+      margin-bottom: 1rem;
+    }
+
+    .feature-desc {
+      font-size: 1rem;
+      color: var(--gray);
+      margin-bottom: 1.5rem;
+      line-height: 1.7;
+    }
+
+    .feature-list {
+      list-style: none;
+    }
+
+    .feature-list li {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+      color: var(--gray);
+      font-size: 0.95rem;
+    }
+
+    .feature-list li::before {
+      content: '';
+      width: 20px;
+      height: 20px;
+      background: var(--blue-primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* ===================== CTA FINAL ===================== */
+    .cta-section {
+      padding: 6rem 2rem;
+      text-align: center;
+      background: var(--blue-primary);
+      color: var(--white);
+    }
+
+    .cta-section .section-title {
+      color: var(--white);
+      margin-bottom: 1rem;
+    }
+
+    .cta-section .section-subtitle {
+      color: var(--blue-sky);
+      margin-bottom: 2rem;
+    }
+
+    .cta-section .hero-cta {
+      background: var(--yellow);
+      color: var(--black);
+    }
+
+    /* ===================== FOOTER ===================== */
+    footer {
+      padding: 3rem 2rem;
+      background: var(--black);
+      color: var(--gray-light);
+      text-align: center;
+    }
+
+    .footer-logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--white);
+      margin-bottom: 1rem;
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .footer-links a {
+      color: var(--gray-light);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover {
+      color: var(--yellow);
+    }
+
+    .footer-copy {
+      font-size: 0.85rem;
+      color: var(--gray);
+    }
+
+    /* ===================== ANIMATIONS ===================== */
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
+    }
+
+    .hero-circle-1 { animation: float 8s ease-in-out infinite; }
+    .hero-circle-2 { animation: float 6s ease-in-out infinite reverse; }
+
+    /* ===================== RESPONSIVE ===================== */
+    @media (max-width: 768px) {
+      .hero-title { font-size: 2.25rem; }
+      .feature-section, .feature-section:nth-child(even) {
+        flex-direction: column;
+        text-align: center;
+      }
+      .stats { gap: 2rem; }
+      .navbar { padding: 0 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a href="index.html" class="navbar-logo">ML Intelligence</a>
+    <a href="dashboard.html" class="navbar-cta">Entrar</a>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-bg">
+      <div class="hero-circle hero-circle-1"></div>
+      <div class="hero-circle hero-circle-2"></div>
+    </div>
+    <div class="hero-content">
+      <span class="hero-badge">Plataforma para vendedores</span>
+      <h1 class="hero-title">Venda mais no <span>Mercado Livre</span></h1>
+      <p class="hero-subtitle">
+        Ferramentas inteligentes para calcular lucro, analisar anuncios com IA, acompanhar concorrentes e monitorar sua performance.
+      </p>
+      <a href="dashboard.html" class="hero-cta">Comecar agora</a>
+    </div>
+  </section>
+
+  <!-- SOCIAL PROOF -->
+  <section class="social-proof">
+    <p class="social-proof-label">Confiado por vendedores</p>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-number">500+</div>
+        <div class="stat-label">Calculos realizados</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number">4</div>
+        <div class="stat-label">Ferramentas disponiveis</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number">24/7</div>
+        <div class="stat-label">Acesso ilimitado</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="about">
+    <div class="about-content">
+      <h2 class="section-title">O que e o ML Intelligence?</h2>
+      <p class="section-subtitle">
+        Uma plataforma completa para vendedores do Mercado Livre. Reunimos todas as ferramentas que voce precisa para entender sua operacao, aumentar sua margem e tomar decisoes baseadas em dados e inteligencia artificial.
+      </p>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="features">
+    <div class="features-header">
+      <h2 class="section-title">Nossas ferramentas</h2>
+      <p class="section-subtitle" style="max-width: 600px; margin: 0 auto;">Cada funcao foi pensada para resolver problemas reais de quem vende no Mercado Livre.</p>
+    </div>
+
+    <!-- Feature 1 -->
+    <div class="feature-section">
+      <div class="feature-visual">
+        <div class="feature-icon-box">🧮</div>
+      </div>
+      <div class="feature-text">
+        <span class="feature-tag">Lucratividade</span>
+        <h3 class="feature-title">Calculadora de Lucro</h3>
+        <p class="feature-desc">
+          Descubra quanto realmente sobra em cada venda. Considere custo do produto, taxa do Mercado Livre, frete e impostos para saber sua margem real.
+        </p>
+        <ul class="feature-list">
+          <li>Calculo instantaneo de lucro e margem</li>
+          <li>Considera todas as taxas do ML</li>
+          <li>Aceita valores com virgula ou ponto</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Feature 2 -->
+    <div class="feature-section">
+      <div class="feature-visual">
+        <div class="feature-icon-box">📦</div>
+      </div>
+      <div class="feature-text">
+        <span class="feature-tag">Inteligencia Artificial</span>
+        <h3 class="feature-title">Analise de Anuncios</h3>
+        <p class="feature-desc">
+          Visualize todos os seus anuncios em um so lugar e peca uma analise detalhada da descricao com inteligencia artificial.
+        </p>
+        <ul class="feature-list">
+          <li>Lista completa dos seus anuncios</li>
+          <li>Analise de descricao com IA</li>
+          <li>Sugestoes de melhoria automaticas</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Feature 3 -->
+    <div class="feature-section">
+      <div class="feature-visual">
+        <div class="feature-icon-box">📈</div>
+      </div>
+      <div class="feature-text">
+        <span class="feature-tag">Metricas</span>
+        <h3 class="feature-title">Performance da Conta</h3>
+        <p class="feature-desc">
+          Acompanhe a evolucao das suas vendas, visualizacoes e taxa de conversao. Entenda o que esta funcionando e onde melhorar.
+        </p>
+        <ul class="feature-list">
+          <li>Graficos de vendas e visualizacoes</li>
+          <li>Taxa de conversao por anuncio</li>
+          <li>Ranking dos mais vendidos</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Feature 4 -->
+    <div class="feature-section">
+      <div class="feature-visual">
+        <div class="feature-icon-box">🔍</div>
+      </div>
+      <div class="feature-text">
+        <span class="feature-tag">Mercado</span>
+        <h3 class="feature-title">Analise de Concorrentes</h3>
+        <p class="feature-desc">
+          Monitore anuncios concorrentes, compare precos, vendas e posicionamento. Receba insights de IA sobre como se destacar.
+        </p>
+        <ul class="feature-list">
+          <li>Busca e monitoramento de concorrentes</li>
+          <li>Comparativo de preco e vendas</li>
+          <li>Insights de IA sobre o mercado</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA FINAL -->
+  <section class="cta-section">
+    <h2 class="section-title">Pronto para vender mais?</h2>
+    <p class="section-subtitle">Acesse agora e comece a usar as ferramentas gratuitamente.</p>
+    <a href="dashboard.html" class="hero-cta">Acessar Dashboard</a>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-logo">ML Intelligence</div>
+    <div class="footer-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="calculator.html">Calculadora</a>
+      <a href="anuncios.html">Anuncios</a>
+      <a href="performance.html">Performance</a>
+      <a href="concorrentes.html">Concorrentes</a>
+    </div>
+    <p class="footer-copy">2026 ML Intelligence. Feito para vendedores do Mercado Livre.</p>
+  </footer>
+
+  <!-- SCROLL ANIMATION -->
+  <script>
+    // Parallax no hero
+    window.addEventListener('scroll', () => {
+      const scrollY = window.scrollY;
+      const circles = document.querySelectorAll('.hero-circle');
+      circles[0].style.transform = `translateY(${scrollY * 0.3}px)`;
+      circles[1].style.transform = `translateY(${scrollY * -0.2}px)`;
+    });
+
+    // Fade-in das features
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.15 });
+
+    document.querySelectorAll('.feature-section').forEach(el => observer.observe(el));
+  </script>
+
+</body>
+</html>

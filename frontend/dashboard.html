@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — ML Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body class="app">
+  <header class="app-header">
+    <a href="dashboard.html" class="app-logo">ML Intelligence</a>
+    <span class="app-user">Ola, vendedor</span>
+  </header>
+
+  <div class="app-body">
+    <aside class="app-sidebar">
+      <nav>
+        <a href="dashboard.html" class="active">Resumo</a>
+        <a href="financeiro.html">Painel Financeiro</a>
+        <a href="calculator.html">Calculadora de Lucro</a>
+        <a href="anuncios.html">Meus Anuncios</a>
+        <a href="performance.html">Performance</a>
+        <a href="concorrentes.html">Concorrentes</a>
+      </nav>
+    </aside>
+
+    <main class="app-main">
+      <h1>Resumo</h1>
+      <p class="subtitle">Visao geral da sua operacao. Acesse as ferramentas abaixo.</p>
+
+      <div class="grid">
+        <a href="financeiro.html" class="card card-link">
+          <span style="font-size: 2rem; margin-bottom: 0.75rem; display: block;">💰</span>
+          <strong>Painel Financeiro</strong>
+          <p style="margin-top: 0.5rem; font-size: 0.9rem;">Indicadores de lucro e margem por anuncio.</p>
+        </a>
+        <a href="calculator.html" class="card card-link">
+          <span style="font-size: 2rem; margin-bottom: 0.75rem; display: block;">🧮</span>
+          <strong>Calculadora de Lucro</strong>
+          <p style="margin-top: 0.5rem; font-size: 0.9rem;">Calcule custo, taxa e margem de cada venda.</p>
+        </a>
+        <a href="anuncios.html" class="card card-link">
+          <span style="font-size: 2rem; margin-bottom: 0.75rem; display: block;">📦</span>
+          <strong>Meus Anuncios</strong>
+          <p style="margin-top: 0.5rem; font-size: 0.9rem;">Visualize e analise suas publicacoes com IA.</p>
+        </a>
+        <a href="performance.html" class="card card-link">
+          <span style="font-size: 2rem; margin-bottom: 0.75rem; display: block;">📈</span>
+          <strong>Performance</strong>
+          <p style="margin-top: 0.5rem; font-size: 0.9rem;">Graficos e metricas da sua conta.</p>
+        </a>
+        <a href="concorrentes.html" class="card card-link">
+          <span style="font-size: 2rem; margin-bottom: 0.75rem; display: block;">🔍</span>
+          <strong>Concorrentes</strong>
+          <p style="margin-top: 0.5rem; font-size: 0.9rem;">Acompanhe o mercado e seu posicionamento.</p>
+        </a>
+      </div>
+
+      <div class="card" style="margin-top: 1rem; padding: 2rem; text-align: center;">
+        <p style="color: var(--gray); margin-bottom: 0.5rem;">Conecte sua conta do Mercado Livre para acessar todas as funcoes.</p>
+        <p style="font-size: 0.9rem; color: var(--gray-light);">(Login e integracao em breve)</p>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

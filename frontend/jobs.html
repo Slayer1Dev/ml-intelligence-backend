@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Jobs</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Jobs executados</h1>
+  <div id="jobs"></div>
+
+  <script>
+    async function carregarJobs(){
+      const res = await fetch("http://127.0.0.1:8000/jobs-list");
+      const data = await res.json();
+
+      let html = "";
+      for(let job of data.jobs){
+        html += `<div>
+          <b>ID:</b> ${job.id} 
+          <b>Status:</b> ${job.status} 
+          <a href="job.html?id=${job.id}">ver resultado</a>
+        </div><hr>`;
+      }
+      document.getElementById("jobs").innerHTML = html;
+    }
+
+    carregarJobs();
+  </script>
+</body>
+</html>
