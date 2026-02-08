@@ -43,6 +43,14 @@
         </div>
       </div>
 
+      <div id="upgrade-required" class="card" style="display: none;">
+        <div class="coming-soon">
+          <h2>Plano Pro necessário</h2>
+          <p>Assine o plano para acessar Meus Anúncios e outras ferramentas.</p>
+          <a href="dashboard.html" class="button" style="margin-top: 1rem;">Ver planos</a>
+        </div>
+      </div>
+
       <div id="loading" class="card" style="text-align: center; padding: 2rem;">
         <p>Carregando anúncios...</p>
       </div>
@@ -71,15 +79,26 @@
     let currentOffset = 0;
     const limit = 20;
 
-    async function checkMLConnection() {
-      try {
-        const res = await authFetch(API_BASE + '/api/ml-status');
-        const data = await res.json();
-        return data.connected;
-      } catch (e) {
-        console.error('Erro ao verificar conexão ML:', e);
-        return false;
+    async function checkMLConnection(retries = 2) {
+      for (let i = 0; i <= retries; i++) {
+        try {
+          const res = await authFetch(API_BASE + '/api/ml-status');
+          if (res.status === 401 && i < retries) {
+            await new Promise(r => setTimeout(r, 1200));
+            continue;
+          }
+          const data = await res.json();
+          return data.connected === true;
+        } catch (e) {
+          if (i < retries) {
+            await new Promise(r => setTimeout(r, 1200));
+            continue;
+          }
+          console.error('Erro ao verificar conexão ML:', e);
+          return false;
+        }
       }
+      return false;
     }
 
     function formatPrice(price) {
@@ -152,7 +171,9 @@
         const res = await authFetch(`${API_BASE}/api/ml/items?status=${status}&limit=${limit}&offset=${offset}`);
         
         if (res.status === 403) {
-          notConnectedEl.style.display = 'block';
+          const errData = await res.json().catch(() => ({}));
+          const isMlNotConnected = errData.detail === 'ml_not_connected';
+          document.getElementById(isMlNotConnected ? 'ml-not-connected' : 'upgrade-required').style.display = 'block';
           loadingEl.style.display = 'none';
           return;
         }
@@ -205,6 +226,7 @@
     async function init() {
       await initClerkAuth({ signInContainerId: 'clerk-signin', userButtonContainerId: 'clerk-user-button', appContentId: 'app-content' });
       
+      if (!window.ClerkAuth?.signedIn) return;
       const connected = await checkMLConnection();
       if (!connected) {
         document.getElementById('ml-not-connected').style.display = 'block';

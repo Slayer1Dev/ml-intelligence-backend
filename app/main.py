@@ -391,7 +391,7 @@ def ml_items(
     if not token or not token.seller_id:
         raise HTTPException(
             status_code=403,
-            detail="Conta do Mercado Livre não conectada. Conecte sua conta primeiro.",
+            detail="ml_not_connected",  # Código para frontend distinguir de paid_guard
         )
     
     result = get_user_items(token.access_token, token.seller_id, status=status, limit=limit, offset=offset)
@@ -423,10 +423,7 @@ def ml_item_details(item_id: str, user: User = Depends(paid_guard)):
     """Busca detalhes de um anúncio específico."""
     token = get_valid_ml_token(user)
     if not token:
-        raise HTTPException(
-            status_code=403,
-            detail="Conta do Mercado Livre não conectada. Conecte sua conta primeiro.",
-        )
+        raise HTTPException(status_code=403, detail="ml_not_connected")
     
     item = get_item_details(token.access_token, item_id)
     if item is None:
@@ -454,10 +451,7 @@ def ml_orders(
     """Lista pedidos/vendas do usuário conectado ao Mercado Livre."""
     token = get_valid_ml_token(user)
     if not token or not token.seller_id:
-        raise HTTPException(
-            status_code=403,
-            detail="Conta do Mercado Livre não conectada. Conecte sua conta primeiro.",
-        )
+        raise HTTPException(status_code=403, detail="ml_not_connected")
     
     result = get_orders(token.access_token, token.seller_id, status=status, limit=limit, offset=offset)
     if result is None:
@@ -474,10 +468,7 @@ def ml_order_details(order_id: str, user: User = Depends(paid_guard)):
     """Busca detalhes de um pedido específico."""
     token = get_valid_ml_token(user)
     if not token:
-        raise HTTPException(
-            status_code=403,
-            detail="Conta do Mercado Livre não conectada. Conecte sua conta primeiro.",
-        )
+        raise HTTPException(status_code=403, detail="ml_not_connected")
     
     order = get_order_details(token.access_token, order_id)
     if order is None:
@@ -494,10 +485,7 @@ def ml_metrics(user: User = Depends(paid_guard)):
     """Retorna métricas gerais da conta do Mercado Livre."""
     token = get_valid_ml_token(user)
     if not token or not token.seller_id:
-        raise HTTPException(
-            status_code=403,
-            detail="Conta do Mercado Livre não conectada. Conecte sua conta primeiro.",
-        )
+        raise HTTPException(status_code=403, detail="ml_not_connected")
     
     # Busca anúncios ativos
     active_items = get_user_items(token.access_token, token.seller_id, status="active", limit=50)

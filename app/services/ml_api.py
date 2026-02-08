@@ -140,7 +140,11 @@ def get_order_details(access_token: str, order_id: str) -> Optional[dict]:
 
 
 def get_multiple_items(access_token: str, item_ids: List[str]) -> Optional[List[dict]]:
-    """Busca múltiplos itens de uma vez (máx 20 por requisição)."""
+    """Busca múltiplos itens de uma vez (máx 20 por requisição).
+    
+    A API do ML retorna [{code: 200, body: {...}}, ...]. Esta função
+    extrai o body de cada resposta e retorna lista de itens.
+    """
     if not item_ids:
         return []
     
@@ -149,4 +153,14 @@ def get_multiple_items(access_token: str, item_ids: List[str]) -> Optional[List[
     resp = requests.get(f"{ML_API}/items", headers=headers, params={"ids": ids_str}, timeout=15)
     if resp.status_code != 200:
         return None
-    return resp.json()
+    
+    raw = resp.json()
+    if not isinstance(raw, list):
+        return []
+    
+    items = []
+    for obj in raw:
+        if isinstance(obj, dict) and obj.get("code") == 200 and "body" in obj:
+            items.append(obj["body"])
+    
+    return items

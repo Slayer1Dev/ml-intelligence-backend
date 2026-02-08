@@ -123,11 +123,12 @@
 
 ## 7. Próximos passos prováveis
 
-1. Implementar chamadas à API do ML (anúncios, vendas, métricas) usando `MlToken`.
+1. ~~Implementar chamadas à API do ML~~ ✅ Feito
 2. Endpoint `POST /api/ml-webhook` para notificações (Orders, Items).
-3. Atualizar painéis com dados reais do ML.
+3. Implementar área **Concorrentes** (busca ML + comparação).
 4. Customer Portal Mercado Pago (gerenciar assinatura).
 5. Certificação do app no Mercado Livre.
+6. Ver `SITUACAO-E-ROADMAP.md` para análise detalhada e prioridades.
 
 ---
 
