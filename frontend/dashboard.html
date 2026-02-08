@@ -69,6 +69,7 @@
       <div id="upgrade-cta" class="card" style="margin-top: 1rem; padding: 2rem; text-align: center; display: none;">
         <p style="color: var(--gray); margin-bottom: 0.5rem;">Assine o plano para desbloquear o Painel Financeiro, Meus Anuncios, Performance e Concorrentes.</p>
         <button id="btn-assinar" class="btn" style="margin-top: 1rem;">Assinar agora</button>
+        <p style="margin-top: 1rem; font-size: 0.85rem;"><a href="#" id="link-debug-admin">Debug: por que não sou admin?</a></p>
       </div>
 
       <div id="ml-cta" class="card" style="margin-top: 1rem; padding: 2rem; text-align: center;">
@@ -128,6 +129,16 @@
       if (!isPaid && !isAdmin) {
         document.getElementById('upgrade-cta').style.display = 'block';
         document.getElementById('btn-assinar').onclick = assinarPlano;
+        document.getElementById('link-debug-admin').onclick = async (e) => {
+          e.preventDefault();
+          try {
+            const res = await authFetch(API_BASE + '/api/debug-admin');
+            const d = await res.json();
+            alert('Seu email: ' + (d.seu_email || '(vazio)') + '\n\n' + d.dica);
+          } catch (err) {
+            alert('Erro: ' + (err.message || 'Não foi possível consultar'));
+          }
+        };
       }
     }
 
