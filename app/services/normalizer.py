@@ -4,12 +4,12 @@ def normalize_concorrentes(concorrentes):
     for c in concorrentes:
         try:
             preco = float(c.get("preco", 0))
-        except:
+        except Exception:
             preco = 0.0
 
         try:
             vendas = int(c.get("vendas", 0))
-        except:
+        except Exception:
             vendas = 0
 
         lider = str(c.get("lider", "")).lower() in ["sim", "true", "1"]

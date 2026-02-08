@@ -22,6 +22,12 @@ pip install fastapi uvicorn pydantic python-dotenv requests pandas openpyxl aiof
 uvicorn app.main:app --reload
 ```
 
+Se o `uvicorn` não estiver no PATH:
+
+```bash
+python -m uvicorn app.main:app --reload
+```
+
 ### 3. Abrir no navegador
 
 - **Landing page:** http://127.0.0.1:8000/frontend/

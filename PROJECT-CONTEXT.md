@@ -124,12 +124,12 @@
 
 ## 7. Próximos passos prováveis
 
-1. ~~Implementar chamadas à API do ML~~ ✅ Feito
-2. Endpoint `POST /api/ml-webhook` para notificações (Orders, Items).
-3. Implementar área **Concorrentes** (busca ML + comparação).
-4. Customer Portal Mercado Pago (gerenciar assinatura).
-5. Certificação do app no Mercado Livre.
-6. Ver `SITUACAO-E-ROADMAP.md` para análise detalhada e prioridades.
+- ~~Implementar chamadas à API do ML~~ ✅  
+- ~~Concorrentes (busca + comparação)~~ ✅ (busca pública; certificação ML para busca autenticada é opcional)  
+- ~~Persistência em produção (PostgreSQL)~~ ✅  
+- **Curto prazo:** melhorar Performance, expandir logs de IA (opcional), avaliar certificação ML.  
+- **Backlog:** `POST /api/ml-webhook`, Customer Portal MP, cache ML, editor de prompts, mensagens ML.  
+- Detalhes e prioridades em **`SITUACAO-E-ROADMAP.md`**.
 
 ---
 

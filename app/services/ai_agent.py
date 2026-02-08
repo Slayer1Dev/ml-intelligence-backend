@@ -31,7 +31,7 @@ def analyze_market(produto, concorrentes):
                 insights.append(
                     f"O líder vende mais barato (R${preco_lider}) que seu produto (R${preco_produto})."
                 )
-        except:
+        except Exception:
             pass
 
     return {
@@ -41,8 +41,8 @@ def analyze_market(produto, concorrentes):
 from app.services.profit_calculator import calculate_profit
 from app.services.user_settings import get_settings
 
-def analyze_uploaded_sheet(records):
-    settings = get_settings()
+def analyze_uploaded_sheet(records, user_id=None):
+    settings = get_settings(user_id or "")
 
     results = []
 

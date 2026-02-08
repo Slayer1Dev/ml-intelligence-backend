@@ -9,7 +9,11 @@ from pydantic import BaseModel
 
 from app.auth import ADMIN_EMAILS, admin_guard, clerk_auth_guard, get_clerk_config, get_current_user, is_admin
 
+import hashlib
+import hmac
+import json
 import logging
+import time
 import uuid
 from pathlib import Path
 import aiofiles
@@ -96,27 +100,52 @@ from app.services.ml_api import (
 # STORE de jobs (em memória)
 # ------------------------------------------------------------------
 JOB_STORE: Dict[str, Dict[str, Any]] = {}
+JOB_STORE_MAX_SIZE = 500
+
+
+def _trim_job_store(max_size: int = JOB_STORE_MAX_SIZE) -> None:
+    """Mantém apenas os últimos max_size jobs (FIFO) para evitar crescimento ilimitado."""
+    if len(JOB_STORE) < max_size:
+        return
+    keys = sorted(JOB_STORE.keys(), key=lambda k: JOB_STORE.get(k, {}).get("_created", 0) or 0)
+    for k in keys[: len(JOB_STORE) - max_size]:
+        JOB_STORE.pop(k, None)
+
 
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
-def process_job(job_id: str, file_path: str):
+def process_job(job_id: str, file_path: str, user_id: Optional[int] = None):
     """Processa a planilha em background e atualiza JOB_STORE."""
     logger.info(f"Job {job_id} - iniciando processamento do arquivo {file_path}")
     JOB_STORE[job_id]["status"] = "processing"
     try:
         records = process_sheet(file_path)
         if isinstance(records, dict) and records.get("error"):
-            JOB_STORE[job_id] = {"status": "error", "error": records.get("error")}
+            prev = JOB_STORE.get(job_id, {})
+            JOB_STORE[job_id] = {"status": "error", "error": records.get("error"), "_created": prev.get("_created", time.time())}
             logger.error(f"Job {job_id} - erro no processamento: {records.get('error')}")
             return
 
-        analysis = analyze_uploaded_sheet(records)
-        JOB_STORE[job_id] = {"status": "done", "result": analysis}
+        records_list = records.get("records", []) if isinstance(records, dict) else []
+        analysis = analyze_uploaded_sheet(records_list, user_id=user_id)
+        prev = JOB_STORE.get(job_id, {})
+        JOB_STORE[job_id] = {"status": "done", "result": analysis, "_created": prev.get("_created", time.time())}
         logger.info(f"Job {job_id} - finalizado com sucesso")
     except Exception as e:
-        JOB_STORE[job_id] = {"status": "error", "error": str(e)}
+        err_msg = str(e)
+        if "KeyError" in type(e).__name__ or "TypeError" in type(e).__name__:
+            user_msg = "Erro ao processar dados da planilha. Verifique se as colunas sku, custo_produto e preco_venda existem."
+        else:
+            user_msg = err_msg
+        prev = JOB_STORE.get(job_id, {})
+        JOB_STORE[job_id] = {"status": "error", "error": user_msg, "_created": prev.get("_created", time.time())}
         logger.exception(f"Job {job_id} - falhou: {e}")
+    finally:
+        try:
+            Path(file_path).unlink(missing_ok=True)
+        except Exception as ex:
+            logger.warning("Falha ao remover arquivo temporário %s: %s", file_path, ex)
 
 # ------------------------------------------------------------------
 # Guards (dependências para rotas)
@@ -318,14 +347,27 @@ def _parse_analise_anuncios(file_bytes: bytes) -> List[Dict[str, Any]]:
 
 
 def _parse_costs_sheet(file_bytes: bytes, filename: str) -> Dict[str, float]:
-    ext = (filename or "").lower()
-    if ext.endswith(".csv"):
-        df = pd.read_csv(io.BytesIO(file_bytes))
-    else:
+    """Detecta CSV vs Excel pelo conteúdo (magic bytes) ou pela extensão do nome."""
+    is_excel = filename and (filename.lower().endswith(".xlsx") or filename.lower().endswith(".xls"))
+    if not is_excel and len(file_bytes) >= 4:
+        if file_bytes[:2] == b"PK" or file_bytes[:4] == b"\xd0\xcf\x11\xe0":
+            is_excel = True
+    if not is_excel:
+        try:
+            df = pd.read_csv(io.BytesIO(file_bytes))
+            if len(df.columns) >= 2:
+                pass
+            else:
+                is_excel = True
+        except Exception:
+            is_excel = True
+    if is_excel:
         xl = pd.ExcelFile(io.BytesIO(file_bytes))
         sheet_names = [s.lower() for s in xl.sheet_names]
         sheet = "custos" if "custos" in sheet_names else xl.sheet_names[0]
         df = xl.parse(sheet)
+    else:
+        df = pd.read_csv(io.BytesIO(file_bytes))
 
     df = df.dropna(how="all")
 
@@ -989,20 +1031,40 @@ async def financial_dashboard(
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
-    df["PRICE_NUM"] = pd.to_numeric(df.get("PRICE"), errors="coerce")
-    df["FEE_PCT"] = df.get("FEE_PER_SALE").apply(_parse_percent)
-    df["FEE_AMOUNT"] = df["PRICE_NUM"] * (df["FEE_PCT"] / 100)
+    # Colunas da planilha ML podem vir em PT ou EN
+    price_col = _find_col(df, "PRICE", "Preço", "Preco", "VALOR")
+    fee_col = _find_col(df, "FEE_PER_SALE", "TAXA", "Taxa", "FEE")
+    sku_col = _find_col(df, "SKU", "COD. DO PROD.", "COD DO PROD", "CODIGO")
+    status_col = _find_col(df, "STATUS", "Status", "ESTADO")
+    qty_col = _find_col(df, "QUANTITY", "QUANTITY", "Quantidade", "QTD", "ESTQ")
+    title_col = _find_col(df, "TITLE", "Título", "Titulo", "DESCRIÇÃO", "Descricao")
 
-    df["SKU_STR"] = df.get("SKU").astype(str).str.strip()
+    if not price_col:
+        raise HTTPException(status_code=400, detail="Coluna de preço (PRICE/Preço) não encontrada na planilha.")
+    df["PRICE_NUM"] = pd.to_numeric(df[price_col], errors="coerce")
+    if fee_col:
+        df["FEE_PCT"] = df[fee_col].apply(_parse_percent)
+    else:
+        df["FEE_PCT"] = 0.0
+    df["FEE_AMOUNT"] = df["PRICE_NUM"] * (df["FEE_PCT"].fillna(0) / 100)
+
+    df["SKU_STR"] = (df[sku_col] if sku_col else df.iloc[:, 0]).astype(str).str.strip()
     df["COST"] = df["SKU_STR"].map(cost_map) if cost_map else pd.NA
 
     df["COST_TOTAL"] = df["COST"] + df["FEE_AMOUNT"] + embalagem + frete
     df["PROFIT"] = df["PRICE_NUM"] - df["COST_TOTAL"]
-    df["MARGIN_PCT"] = (df["PROFIT"] / df["PRICE_NUM"]) * 100
+    price_safe = df["PRICE_NUM"].replace(0, float("nan"))
+    df["MARGIN_PCT"] = (df["PROFIT"] / price_safe) * 100
 
     total_listings = int(len(df))
-    active_listings = int(df.get("STATUS").astype(str).str.contains("Ativo", case=False, na=False).sum())
-    total_stock = int(pd.to_numeric(df.get("QUANTITY"), errors="coerce").fillna(0).sum())
+    if status_col:
+        active_listings = int(df[status_col].astype(str).str.contains("Ativo", case=False, na=False).sum())
+    else:
+        active_listings = total_listings
+    if qty_col:
+        total_stock = int(pd.to_numeric(df[qty_col], errors="coerce").fillna(0).sum())
+    else:
+        total_stock = 0
 
     avg_price = float(df["PRICE_NUM"].mean()) if total_listings else 0.0
     avg_fee_pct = float(df["FEE_PCT"].mean()) if total_listings else 0.0
@@ -1014,8 +1076,12 @@ async def financial_dashboard(
 
     missing_cost = int(df["COST"].isna().sum())
 
+    title_series = df[title_col] if title_col else df["SKU_STR"]
+    top_cols = ["ITEM_ID", "SKU_STR", "PRICE_NUM", "COST", "PROFIT", "MARGIN_PCT"]
+    top_df = df.copy()
+    top_df["TITLE"] = title_series
     top_profit = (
-        df[["ITEM_ID", "SKU_STR", "TITLE", "PRICE_NUM", "COST", "PROFIT", "MARGIN_PCT"]]
+        top_df[["ITEM_ID", "SKU_STR", "TITLE", "PRICE_NUM", "COST", "PROFIT", "MARGIN_PCT"]]
         .dropna(subset=["PROFIT"])
         .sort_values("PROFIT", ascending=False)
         .head(10)
@@ -1057,25 +1123,25 @@ async def analise_anuncios(file: UploadFile = File(...), user: User = Depends(pa
 
 
 @app.get("/sheets/test")
-def test_sheets():
+def test_sheets(user: User = Depends(get_current_user)):
     return read_sheet()
 
 
 @app.get("/analysis/base")
-def base_analysis():
+def base_analysis(user: User = Depends(get_current_user)):
     data = read_sheet()
     concorrentes = normalize_concorrentes(data.get("concorrentes", []))
     return {"produto": data.get("produto", []), "concorrentes": concorrentes}
 
 
 @app.get("/analysis/market")
-def market_analysis():
+def market_analysis(user: User = Depends(get_current_user)):
     data = read_sheet()
     return analyze_market(produto=data.get("produto", []), concorrentes=data.get("concorrentes", []))
 
 
 @app.get("/analysis/market/ai")
-def market_analysis_ai():
+def market_analysis_ai(user: User = Depends(get_current_user)):
     data = read_sheet()
     prompt = market_prompt(produto=data.get("produto", []), concorrentes=data.get("concorrentes", []))
     return run_market_analysis(prompt)
@@ -1107,9 +1173,10 @@ async def upload_planilha(
         logger.exception(f"Erro ao salvar arquivo: {e}")
         raise HTTPException(status_code=500, detail="Erro ao salvar arquivo")
 
-    # registra job e dispara background
-    JOB_STORE[job_id] = {"status": "pending", "filename": file.filename}
-    background_tasks.add_task(process_job, job_id, str(file_path))
+    # registra job e dispara background (limita JOB_STORE aos últimos 500 jobs)
+    _trim_job_store(JOB_STORE_MAX_SIZE)
+    JOB_STORE[job_id] = {"status": "pending", "filename": file.filename, "_created": time.time()}
+    background_tasks.add_task(process_job, job_id, str(file_path), user.id)
 
     logger.info(f"Job {job_id} enfileirado para {file.filename} ({file_path})")
     return JSONResponse({"job_id": job_id, "status": "pending"})
@@ -1196,13 +1263,47 @@ def create_checkout(request: Request, user: User = Depends(get_current_user)):
     return {"url": url}
 
 
+def _verify_mp_webhook_signature(raw_body: bytes, x_signature: Optional[str], secret: str) -> bool:
+    """Verifica assinatura do webhook MP (x-signature). Se MP_WEBHOOK_SECRET não estiver definido, aceita qualquer POST."""
+    if not secret:
+        return True
+    if not x_signature:
+        return False
+    try:
+        parts = dict(p.split("=", 1) for p in x_signature.split(",") if "=" in p)
+        v1 = parts.get("v1", "").strip()
+        ts = parts.get("ts", "").strip()
+        if not v1:
+            return False
+        secret_b = secret.encode() if isinstance(secret, str) else secret
+        # Padrão comum: v1 = HMAC-SHA256(secret, body) ou HMAC(secret, "id:ts")
+        expected_body = hmac.new(secret_b, raw_body, hashlib.sha256).hexdigest()
+        if hmac.compare_digest(v1, expected_body):
+            return True
+        if ts:
+            expected_ts = hmac.new(secret_b, ts.encode(), hashlib.sha256).hexdigest()
+            if hmac.compare_digest(v1, expected_ts):
+                return True
+        return False
+    except Exception:
+        return False
+
+
 @app.post("/api/mercado-pago-webhook")
 async def mercado_pago_webhook(request: Request):
     """Recebe notificações do Mercado Pago (subscription_preapproval)."""
+    raw_body = await request.body()
     try:
-        body = await request.json()
+        body = json.loads(raw_body.decode("utf-8"))
     except Exception:
         raise HTTPException(status_code=400, detail="Payload inválido")
+
+    mp_secret = os.getenv("MP_WEBHOOK_SECRET", "").strip()
+    if mp_secret:
+        x_sig = request.headers.get("x-signature") or request.headers.get("X-Signature")
+        if not _verify_mp_webhook_signature(raw_body, x_sig, mp_secret):
+            logger.warning("Webhook MP: assinatura inválida ou ausente")
+            raise HTTPException(status_code=401, detail="Assinatura do webhook inválida")
 
     topic = body.get("type")  # subscription_preapproval, subscription_authorized_payment, etc
     if topic != "subscription_preapproval":
