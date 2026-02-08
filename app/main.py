@@ -489,10 +489,12 @@ def ml_search(
     sort: Optional[str] = None,
     user: User = Depends(paid_guard),
 ):
-    """Busca pública no ML — lista concorrentes por termo."""
+    """Busca no ML — lista concorrentes por termo. Usa token do usuário se disponível."""
     if not q or len(q.strip()) < 2:
         raise HTTPException(status_code=400, detail="Digite pelo menos 2 caracteres para buscar.")
-    result = search_public(site_id="MLB", q=q.strip(), limit=limit, offset=offset, sort=sort)
+    token = get_valid_ml_token(user)
+    access_token = token.access_token if token else None
+    result = search_public(site_id="MLB", q=q.strip(), limit=limit, offset=offset, sort=sort, access_token=access_token)
     if result is None:
         raise HTTPException(status_code=500, detail="Erro ao buscar no Mercado Livre.")
     return result
@@ -520,7 +522,7 @@ def ml_compare(
         raise HTTPException(status_code=400, detail="Não foi possível definir termo de busca para este anúncio.")
     
     # Busca até 50 resultados para encontrar a posição do usuário
-    result = search_public(site_id="MLB", q=search_term[:80], limit=50, offset=0)
+    result = search_public(site_id="MLB", q=search_term[:80], limit=50, offset=0, access_token=token.access_token)
     if result is None:
         raise HTTPException(status_code=500, detail="Erro ao buscar concorrentes.")
     

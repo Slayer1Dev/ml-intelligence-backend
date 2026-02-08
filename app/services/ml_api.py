@@ -1,8 +1,11 @@
+import logging
 import os
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 
 import requests
+
+_log = logging.getLogger("ml-intelligence")
 
 ML_APP_ID = os.getenv("ML_APP_ID")
 ML_SECRET = os.getenv("ML_SECRET")
@@ -151,8 +154,15 @@ def get_order_details(access_token: str, order_id: str) -> Optional[dict]:
     return resp.json()
 
 
-def search_public(site_id: str = "MLB", q: str = "", limit: int = 50, offset: int = 0, sort: Optional[str] = None) -> Optional[dict]:
-    """Busca pública no Mercado Livre (não requer token).
+def search_public(
+    site_id: str = "MLB",
+    q: str = "",
+    limit: int = 50,
+    offset: int = 0,
+    sort: Optional[str] = None,
+    access_token: Optional[str] = None,
+) -> Optional[dict]:
+    """Busca no Mercado Livre. Funciona com ou sem token; com token tende a ser mais estável.
     
     Retorna anúncios do marketplace com: id, title, price, sold_quantity, permalink, etc.
     """
@@ -165,10 +175,19 @@ def search_public(site_id: str = "MLB", q: str = "", limit: int = 50, offset: in
     }
     if sort:
         params["sort"] = sort
-    resp = requests.get(f"{ML_API}/sites/{site_id}/search", params=params, timeout=15)
-    if resp.status_code != 200:
+    headers = {}
+    if access_token:
+        headers["Authorization"] = f"Bearer {access_token}"
+    headers["User-Agent"] = "MLIntelligence/1.0 (https://mercadoinsights.online)"
+    try:
+        resp = requests.get(f"{ML_API}/sites/{site_id}/search", params=params, headers=headers, timeout=15)
+        if resp.status_code != 200:
+            _log.warning("ML search failed: status=%s body=%s", resp.status_code, resp.text[:200])
+            return None
+        return resp.json()
+    except requests.RequestException as e:
+        _log.warning("ML search request error: %s", e)
         return None
-    return resp.json()
 
 
 def get_multiple_items(access_token: str, item_ids: List[str]) -> Optional[List[dict]]:
