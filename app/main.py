@@ -7,7 +7,7 @@ from fastapi.responses import PlainTextResponse, JSONResponse, RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
-from app.auth import admin_guard, clerk_auth_guard, get_clerk_config, get_current_user, is_admin
+from app.auth import ADMIN_EMAILS, admin_guard, clerk_auth_guard, get_clerk_config, get_current_user, is_admin
 
 import logging
 import uuid
@@ -247,6 +247,28 @@ def get_me(user: User = Depends(get_current_user)):
         "plan": user.plan,
         "email": user.email,
         "isAdmin": is_admin(user.email),
+    }
+
+
+@app.get("/api/debug-admin")
+def debug_admin(user: User = Depends(get_current_user)):
+    """Diagnóstico: por que isAdmin pode estar false. Use para conferir ADMIN_EMAILS."""
+    email = user.email
+    is_admin_result = is_admin(email)
+    return {
+        "seu_email": email,
+        "isAdmin": is_admin_result,
+        "admin_emails_quantidade": len(ADMIN_EMAILS),
+        "dica": (
+            "Seu email está vazio no sistema - verifique se o Clerk JWT envia o claim 'email'."
+            if not email
+            else (
+                "ADMIN_EMAILS vazio no Railway." if not ADMIN_EMAILS else
+                ("Email não consta em ADMIN_EMAILS. No Railway, use exatamente: " + repr(email))
+                if not is_admin_result else
+                "Tudo ok - você é admin."
+            )
+        ),
     }
 
 
