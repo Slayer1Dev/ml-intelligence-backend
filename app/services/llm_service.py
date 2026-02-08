@@ -1,11 +1,25 @@
 import json
+import os
 import re
 import logging
 from openai import OpenAI
 
 logger = logging.getLogger("LLM")
 
-client = OpenAI()
+_client: OpenAI | None = None
+
+
+def _get_client() -> OpenAI:
+    """Cria o client OpenAI de forma lazy; evita crash na inicialização se OPENAI_API_KEY não existir."""
+    global _client
+    if _client is None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "OPENAI_API_KEY não configurada. Configure a variável de ambiente no Railway ou no .env."
+            )
+        _client = OpenAI(api_key=api_key)
+    return _client
 
 
 def extract_json(text: str):
@@ -26,6 +40,7 @@ def extract_json(text: str):
 def run_market_analysis(prompt: str):
     logger.info("Enviando prompt ao LLM")
 
+    client = _get_client()
     response = client.responses.create(
         model="gpt-4.1-mini",
         input=prompt
