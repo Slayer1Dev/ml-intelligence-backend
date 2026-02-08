@@ -1,6 +1,6 @@
-# app/models.py — Modelos User e Subscription
+# app/models.py — Modelos User, Subscription, ItemCost (dados por usuário)
 from datetime import datetime
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -39,7 +39,7 @@ class Subscription(Base):
     __tablename__ = "subscriptions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     stripe_subscription_id = Column(String(128), nullable=True)
     status = Column(String(32), default="active")  # active | canceled | past_due
     started_at = Column(DateTime, nullable=True)
@@ -50,8 +50,9 @@ class Subscription(Base):
 
 
 class ItemCost(Base):
-    """Custos customizados por anúncio (embalagem, frete, imposto, custo) — painel financeiro."""
+    """Custos e dados por anúncio por usuário (custo, embalagem, frete, imposto). Um registro por (user_id, item_id)."""
     __tablename__ = "item_costs"
+    __table_args__ = (UniqueConstraint("user_id", "item_id", name="uq_item_costs_user_item"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)

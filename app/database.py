@@ -1,4 +1,4 @@
-# app/database.py — Conexão SQLite e sessão
+# app/database.py — Conexão ao banco (SQLite local / PostgreSQL produção)
 import os
 from pathlib import Path
 
@@ -7,9 +7,19 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _db_file = (_PROJECT_ROOT / "ml_intelligence.db").as_posix()
-_DB_PATH = os.getenv("DATABASE_URL", f"sqlite:///{_db_file}")
 
-engine = create_engine(_DB_PATH, connect_args={"check_same_thread": False} if "sqlite" in _DB_PATH else {})
+# Produção: use DATABASE_URL (PostgreSQL) para persistência entre deploys.
+# SQLite no servidor é apagado a cada deploy (filesystem efêmero).
+_raw_url = os.getenv("DATABASE_URL", f"sqlite:///{_db_file}")
+if _raw_url.startswith("postgres://"):
+    _raw_url = _raw_url.replace("postgres://", "postgresql://", 1)
+
+_DB_PATH = _raw_url
+_connect_args = {}
+if "sqlite" in _DB_PATH:
+    _connect_args["check_same_thread"] = False
+
+engine = create_engine(_DB_PATH, connect_args=_connect_args or None)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -24,7 +34,10 @@ def get_db():
 
 
 def init_db():
-    """Cria as tabelas se não existirem."""
+    """Cria as tabelas se não existirem. Em produção use DATABASE_URL (PostgreSQL) para persistir dados."""
+    import logging
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    kind = "SQLite (dados locais)" if "sqlite" in _DB_PATH else "PostgreSQL (persistente)"
+    logging.getLogger("ml-intelligence").info("Banco: %s", kind)

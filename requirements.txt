@@ -9,6 +9,7 @@ openpyxl
 aiofiles
 fastapi-clerk-auth
 sqlalchemy
+psycopg2-binary
 gspread
 google-auth
 openai

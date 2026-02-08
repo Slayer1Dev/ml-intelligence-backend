@@ -38,7 +38,7 @@
 | `main.py` | Rotas FastAPI, guards, endpoints Stripe/MP/ML, mounts estáticos |
 | `auth.py` | Clerk JWT, `get_current_user`, `is_admin`, `admin_guard`, `paid_guard`, `ADMIN_EMAILS`, extração de email |
 | `models.py` | `User`, `Subscription`, `MlToken` (SQLAlchemy) |
-| `database.py` | `SessionLocal`, `init_db`, SQLite ou `DATABASE_URL` |
+| `database.py` | `SessionLocal`, `init_db`. **Produção:** definir `DATABASE_URL` (PostgreSQL) para persistir dados entre deploys; SQLite no servidor é efêmero. |
 | `services/ml_api.py` | OAuth ML: `get_auth_url`, `exchange_code_for_tokens`, `refresh_access_token` |
 | `services/mercado_pago_service.py` | Assinaturas MP: `create_checkout_url`, handlers webhook |
 | `services/stripe_service.py` | (Legado) não usado — migrado para Mercado Pago |
@@ -81,7 +81,7 @@
 
 - `FRONTEND_URL`, `BACKEND_URL` — URLs base
 - `MP_PLAN_VALUE`, `MP_PLAN_REASON` — valor e nome do plano
-- `DATABASE_URL` — SQLite por padrão
+- `DATABASE_URL` — **Em produção, use PostgreSQL** (ex.: Railway Postgres) para persistir custos e dados entre deploys; sem isso, SQLite no servidor é apagado a cada deploy.
 - `OPENAI_API_KEY` — IA (opcional)
 - `ALLOWED_ORIGINS` — CORS
 
@@ -133,8 +133,12 @@
 
 ---
 
-## 8. Estrutura do banco
+## 8. Estrutura do banco (dados por usuário)
 
 - `users` — clerk_user_id, email, plan (free|active)
-- `subscriptions` — user_id, stripe_subscription_id (reutilizado para MP), status
-- `ml_tokens` — user_id, access_token, refresh_token, seller_id
+- `subscriptions` — user_id, stripe_subscription_id (reutilizado para MP), status, started_at, ends_at
+- `ml_tokens` — user_id, access_token, refresh_token, seller_id (um por usuário)
+- `item_costs` — user_id, item_id (único por usuário+item), custo_produto, embalagem, frete, taxa_pct, imposto_pct
+- `audit_logs` — user_id, event_type, message (logs de falhas IA, etc.)
+
+Todas as tabelas de dados sensíveis são filtradas por `user_id`; custos e tokens não são compartilhados entre usuários.

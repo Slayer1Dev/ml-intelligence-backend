@@ -82,6 +82,8 @@
 ### Banco de dados
 
 - Tabela `audit_logs` criada automaticamente no `init_db`.
+- **Persistência em produção:** definir `DATABASE_URL` com PostgreSQL (ex.: Railway adiciona ao criar o plugin Postgres). Sem isso, o SQLite no servidor é efêmero e custos/dados somem a cada deploy.
+- `item_costs`: constraint único `(user_id, item_id)`; dados sempre filtrados por `user_id`.
 
 ---
 
