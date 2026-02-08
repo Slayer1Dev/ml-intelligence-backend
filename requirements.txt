@@ -12,4 +12,3 @@ sqlalchemy
 gspread
 google-auth
 openai
-stripe

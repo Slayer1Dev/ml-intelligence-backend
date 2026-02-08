@@ -73,11 +73,11 @@ from app.services.ai_agent import analyze_market, analyze_uploaded_sheet
 from app.services.prompts import market_prompt
 from app.services.llm_service import run_market_analysis
 from app.services.sheet_processor import process_sheet
-from app.services.stripe_service import (
-    create_checkout_session,
-    handle_checkout_completed,
-    handle_subscription_deleted,
-    handle_subscription_updated,
+from app.services.mercado_pago_service import (
+    create_checkout_url,
+    handle_preapproval_created,
+    handle_preapproval_updated,
+    get_preapproval,
 )
 
 # ------------------------------------------------------------------
@@ -467,47 +467,52 @@ def admin_subscriptions(admin_user: User = Depends(admin_guard)):
 
 
 @app.post("/api/create-checkout-session")
-def stripe_create_checkout(request: Request, user: User = Depends(get_current_user)):
-    """Cria sessão Stripe Checkout e retorna a URL para redirecionar o usuário."""
+def create_checkout(request: Request, user: User = Depends(get_current_user)):
+    """Cria sessão Mercado Pago Checkout e retorna a URL para redirecionar o usuário."""
     base_url = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
     if not base_url:
         base_url = str(request.base_url).rstrip("/")
     success_url = f"{base_url}/frontend/dashboard.html?success=1"
     cancel_url = f"{base_url}/frontend/dashboard.html?canceled=1"
-    url = create_checkout_session(user.clerk_user_id, success_url, cancel_url)
+    webhook_base = os.getenv("BACKEND_URL", "").strip().rstrip("/") or str(request.base_url).rstrip("/")
+    webhook_url = f"{webhook_base}/api/mercado-pago-webhook" if webhook_base else None
+    url = create_checkout_url(user.clerk_user_id, success_url, cancel_url, webhook_url)
     if not url:
         raise HTTPException(
             status_code=503,
-            detail="Stripe não configurado. Defina STRIPE_SECRET_KEY e STRIPE_PRICE_ID.",
+            detail="Mercado Pago não configurado. Defina MP_ACCESS_TOKEN.",
         )
     return {"url": url}
 
 
-@app.post("/api/stripe-webhook")
-async def stripe_webhook(request: Request):
-    """Recebe eventos do Stripe (checkout.session.completed, customer.subscription.*)."""
-    import stripe
-    from app.services.stripe_service import STRIPE_WEBHOOK_SECRET
-
-    if not STRIPE_WEBHOOK_SECRET:
-        raise HTTPException(status_code=500, detail="STRIPE_WEBHOOK_SECRET não configurado")
-    payload = await request.body()
-    sig_header = request.headers.get("stripe-signature", "")
+@app.post("/api/mercado-pago-webhook")
+async def mercado_pago_webhook(request: Request):
+    """Recebe notificações do Mercado Pago (subscription_preapproval)."""
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
-    except ValueError:
+        body = await request.json()
+    except Exception:
         raise HTTPException(status_code=400, detail="Payload inválido")
-    except stripe.SignatureVerificationError:
-        raise HTTPException(status_code=400, detail="Assinatura inválida")
+
+    topic = body.get("type")  # subscription_preapproval, subscription_authorized_payment, etc
+    if topic != "subscription_preapproval":
+        return {"received": True}
+
+    data = body.get("data", {})
+    preapproval_id = data.get("id")
+    if not preapproval_id:
+        return {"received": True}
+
+    preapproval = get_preapproval(preapproval_id)
+    if not preapproval:
+        return {"received": True}
 
     db = SessionLocal()
     try:
-        if event["type"] == "checkout.session.completed":
-            handle_checkout_completed(event["data"]["object"], db)
-        elif event["type"] == "customer.subscription.deleted":
-            handle_subscription_deleted(event["data"]["object"], db)
-        elif event["type"] == "customer.subscription.updated":
-            handle_subscription_updated(event["data"]["object"], db)
+        action = body.get("action", "")
+        if action in ("created", "authorized"):
+            handle_preapproval_created(preapproval, db)
+        else:
+            handle_preapproval_updated(preapproval, db)
     finally:
         db.close()
     return {"received": True}
