@@ -92,3 +92,39 @@ def run_chat(prompt: str, system_hint: str | None = None) -> str:
     if not raw_text:
         raise RuntimeError("LLM retornou resposta vazia")
     return raw_text
+
+
+def run_answer_for_question(
+    pergunta_texto: str,
+    item_title: str | None = None,
+    few_shot_examples: list[tuple[str, str]] | None = None,
+) -> str:
+    """Gera resposta sugerida para uma pergunta de cliente no anúncio do Mercado Livre.
+    few_shot_examples: lista de (pergunta, resposta) para aprendizado no prompt.
+    """
+    client = _get_client()
+    system = (
+        "Você é um assistente que ajuda vendedores do Mercado Livre a redigir respostas "
+        "profissionais para perguntas de compradores nos anúncios. Seja cordial, objetivo e claro. "
+        "Responda em português, em 2 a 4 frases."
+    )
+    parts = []
+    if few_shot_examples:
+        parts.append("Exemplos de como o vendedor costuma responder:")
+        for p, r in few_shot_examples[-5:]:  # últimos 5
+            parts.append(f"Pergunta: {p[:200]}\nResposta: {r[:300]}")
+        parts.append("")
+    parts.append("Pergunta do cliente no anúncio:")
+    parts.append(pergunta_texto)
+    if item_title:
+        parts.append(f"(Anúncio: {item_title[:150]})")
+    parts.append("\nGere uma resposta profissional e concisa para o vendedor publicar.")
+    prompt = "\n".join(parts)
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
+    try:
+        r = client.chat.completions.create(model="gpt-4o-mini", messages=messages)
+        raw = (r.choices[0].message.content or "").strip()
+        return raw[:2000] if raw else "Obrigado pelo interesse. Em breve retornamos."
+    except Exception as e:
+        logger.warning("run_answer_for_question failed: %s", e)
+        return "Obrigado pela mensagem. Retornaremos em breve."

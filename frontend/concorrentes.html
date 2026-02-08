@@ -50,6 +50,7 @@
         <a href="anuncios.html">Meus Anúncios</a>
         <a href="performance.html">Performance</a>
         <a href="concorrentes.html" class="active">Concorrentes</a>
+        <a href="perguntas-anuncios.html">Perguntas nos anúncios</a>
         <a href="ia-assistente.html">IA Assistente</a>
         <span id="admin-link-wrap" style="display:none;"><hr style="margin: 0.5rem 0; border-color: var(--gray-light);"><a href="admin.html">⚙️ Admin</a></span>
       </nav>
@@ -76,9 +77,27 @@
       </div>
 
       <div id="concorrentes-container" style="display: none;">
+        <!-- Adicionar concorrente por link (funciona mesmo com busca 403) -->
+        <div class="card" style="margin-bottom: 1.5rem;">
+          <h2 style="margin-top: 0;">Adicionar concorrente por link ou ID</h2>
+          <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 1rem;">Cole a URL do anúncio no Mercado Livre ou o ID (ex: MLB123456) para acompanhar um concorrente.</p>
+          <div class="search-box">
+            <input type="text" id="competitor-url-input" placeholder="https://produto.mercadolivre.com.br/... ou MLB123456" style="flex: 1; min-width: 200px;">
+            <button type="button" id="btn-add-competitor" class="btn-concorrentes">Adicionar</button>
+          </div>
+          <div id="competitor-add-msg" style="margin-top: 0.5rem; font-size: 0.9rem;"></div>
+        </div>
+
+        <!-- Lista de concorrentes cadastrados -->
+        <div class="card" style="margin-bottom: 1.5rem;">
+          <h2 style="margin-top: 0;">Meus concorrentes cadastrados</h2>
+          <div id="competitors-list"></div>
+        </div>
+
         <!-- Busca por termo -->
         <div class="card" style="margin-bottom: 1.5rem;">
           <h2 style="margin-top: 0;">Buscar concorrentes por termo</h2>
+          <p style="color: var(--gray); font-size: 0.85rem; margin-bottom: 0.5rem;">Pode retornar 403 se o app não estiver certificado no ML. Use o campo acima para adicionar concorrentes por link.</p>
           <div class="search-box">
             <input type="text" id="search-input" placeholder="Ex: fone bluetooth, notebook gamer..." autocomplete="off">
             <select id="sort-select" style="padding: 0.75rem; border: 1px solid var(--gray-light); border-radius: 8px;">
@@ -156,6 +175,7 @@
         if (mlConnected) {
           document.getElementById('compare-section').style.display = 'block';
           loadMyItems();
+          loadCompetitors();
         } else {
           document.getElementById('ml-not-connected').style.display = 'block';
         }
@@ -183,6 +203,83 @@
         });
       } catch (e) {
         sel.innerHTML = '<option value="">Erro ao carregar anúncios</option>';
+      }
+    }
+
+    async function loadCompetitors() {
+      const listEl = document.getElementById('competitors-list');
+      try {
+        const res = await authFetch(API_BASE + '/api/ml/competitors');
+        if (!res.ok) return;
+        const data = await res.json();
+        const items = data.items || [];
+        if (items.length === 0) {
+          listEl.innerHTML = '<p style="color: var(--gray);">Nenhum concorrente cadastrado. Adicione pelo link ou ID acima.</p>';
+          return;
+        }
+        listEl.innerHTML = items.map(it => {
+          const link = it.permalink || 'https://produto.mercadolivre.com.br/' + (it.item_id || '');
+          const title = (it.nickname || it.title || it.item_id || '').substring(0, 70);
+          const price = it.price != null ? formatPrice(it.price) : '—';
+          const sold = it.sold_quantity != null ? it.sold_quantity : '—';
+          return '<div class="result-row">' +
+            (it.thumbnail ? '<img class="thumb" src="' + it.thumbnail + '" alt="">' : '') +
+            '<div class="info" style="flex:1;">' +
+              '<a href="' + link + '" target="_blank" rel="noopener" style="color: var(--primary);">' + (title || it.item_id) + '</a>' +
+              '<div style="margin-top: 0.25rem;"><span class="price">' + price + '</span> ' +
+              (sold !== '—' ? '<span class="badge">' + sold + ' vendidos</span>' : '') + '</div>' +
+            '</div>' +
+            '<button type="button" class="btn-concorrentes" style="background: #dc2626;" data-item-id="' + (it.item_id || '') + '">Remover</button>' +
+          '</div>';
+        }).join('');
+        listEl.querySelectorAll('button[data-item-id]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const id = btn.getAttribute('data-item-id');
+            if (!id || !confirm('Remover este concorrente?')) return;
+            try {
+              const r = await authFetch(API_BASE + '/api/ml/competitors/' + encodeURIComponent(id), { method: 'DELETE' });
+              if (r.ok) loadCompetitors();
+              else alert((await r.json()).detail || 'Erro ao remover.');
+            } catch (e) { alert('Erro ao remover.'); }
+          });
+        });
+      } catch (e) {
+        listEl.innerHTML = '<p style="color: #dc2626;">Erro ao carregar concorrentes.</p>';
+      }
+    }
+
+    async function addCompetitor() {
+      const input = document.getElementById('competitor-url-input');
+      const msg = document.getElementById('competitor-add-msg');
+      const val = (input.value || '').trim();
+      if (!val) {
+        msg.textContent = 'Informe a URL ou o ID do anúncio.';
+        msg.style.color = '#dc2626';
+        return;
+      }
+      const isUrl = /^https?:\/\//i.test(val);
+      const body = isUrl ? { url: val } : { item_id: val };
+      msg.textContent = 'Adicionando...';
+      msg.style.color = '';
+      try {
+        const res = await authFetch(API_BASE + '/api/ml/competitors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          msg.textContent = data.detail || 'Erro ao adicionar.';
+          msg.style.color = '#dc2626';
+          return;
+        }
+        msg.textContent = data.message || 'Concorrente adicionado.';
+        msg.style.color = '#059669';
+        input.value = '';
+        loadCompetitors();
+      } catch (e) {
+        msg.textContent = 'Erro de conexão.';
+        msg.style.color = '#dc2626';
       }
     }
 
@@ -362,6 +459,7 @@
       const ok = await checkAccess();
       if (!ok) return;
 
+      document.getElementById('btn-add-competitor').addEventListener('click', addCompetitor);
       document.getElementById('btn-search').addEventListener('click', () => doSearch(0));
       document.getElementById('search-input').addEventListener('keypress', e => {
         if (e.key === 'Enter') doSearch(0);

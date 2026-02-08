@@ -13,6 +13,7 @@ class User(Base):
     clerk_user_id = Column(String(128), unique=True, nullable=False, index=True)
     email = Column(String(255), nullable=True)
     plan = Column(String(32), default="free")  # free | active
+    telegram_chat_id = Column(String(64), nullable=True)  # para notificações de perguntas nos anúncios
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -79,3 +80,50 @@ class AuditLog(Base):
     message = Column(String(512), nullable=True)
     extra = Column(String(1024), nullable=True)  # JSON ou texto
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PendingQuestion(Base):
+    """Fila de perguntas (dos anúncios ML) com resposta sugerida pela IA, aguardando aprovação/edição do vendedor."""
+    __tablename__ = "pending_questions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    question_id = Column(String(64), nullable=False, unique=True, index=True)  # ID da pergunta no ML
+    item_id = Column(String(64), nullable=True, index=True)
+    item_title = Column(String(512), nullable=True)
+    pergunta_texto = Column(String(2048), nullable=False)
+    resposta_ia_sugerida = Column(String(2048), nullable=True)
+    status = Column(String(32), default="pending")  # pending | approved | edited | published
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", backref="pending_questions")
+
+
+class QuestionAnswerFeedback(Base):
+    """Feedback para aprendizado: pergunta + resposta final (aprovada ou editada) publicada no ML."""
+    __tablename__ = "question_answer_feedback"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    question_id = Column(String(64), nullable=False, index=True)
+    item_id = Column(String(64), nullable=True, index=True)
+    pergunta_texto = Column(String(2048), nullable=False)
+    resposta_ia_sugerida = Column(String(2048), nullable=True)
+    resposta_final_publicada = Column(String(2048), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", backref="question_answer_feedback")
+
+
+class CompetitorItem(Base):
+    """Concorrentes cadastrados manualmente pelo vendedor (por link/ID) para comparação."""
+    __tablename__ = "competitor_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    item_id = Column(String(64), nullable=False, index=True)  # ID do anúncio no ML
+    nickname = Column(String(128), nullable=True)  # nome opcional para o vendedor identificar
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", backref="competitor_items")

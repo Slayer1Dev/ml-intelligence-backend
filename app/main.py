@@ -70,7 +70,7 @@ app.add_middleware(
 # ------------------------------------------------------------------
 # *Se der ImportError, colocar os módulos no PYTHONPATH ou ajustar import relativo*
 from app.database import SessionLocal, init_db
-from app.models import AuditLog, ItemCost, MlToken, Subscription, User
+from app.models import AuditLog, CompetitorItem, ItemCost, MlToken, PendingQuestion, QuestionAnswerFeedback, Subscription, User
 from app.services.sheets_reader import read_sheet
 from app.services.normalizer import normalize_concorrentes
 from app.services.ai_agent import analyze_market, analyze_uploaded_sheet
@@ -93,6 +93,10 @@ from app.services.ml_api import (
     get_orders,
     get_order_details,
     get_multiple_items,
+    get_question_detail,
+    get_questions_search,
+    get_item_by_id,
+    post_answer,
     search_public,
 )
 
@@ -416,12 +420,35 @@ def clerk_config():
 
 @app.get("/api/me")
 def get_me(user: User = Depends(get_current_user)):
-    """Retorna dados do usuário logado (plan, email, isAdmin)."""
+    """Retorna dados do usuário logado (plan, email, isAdmin, telegramLinked)."""
     return {
         "plan": user.plan,
         "email": user.email,
         "isAdmin": is_admin(user.email),
+        "telegramLinked": bool(getattr(user, "telegram_chat_id", None)),
     }
+
+
+class TelegramLinkInput(BaseModel):
+    chat_id: str
+
+
+@app.post("/api/me/telegram")
+def link_telegram(data: TelegramLinkInput, user: User = Depends(get_current_user)):
+    """Vincula o chat_id do Telegram ao usuário para receber notificações de perguntas nos anúncios."""
+    chat_id = (data.chat_id or "").strip()
+    if not chat_id:
+        raise HTTPException(status_code=400, detail="chat_id é obrigatório.")
+    db = SessionLocal()
+    try:
+        u = db.query(User).filter(User.id == user.id).first()
+        if not u:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+        u.telegram_chat_id = chat_id[:64]
+        db.commit()
+        return {"ok": True, "message": "Telegram vinculado. Você receberá notificações de novas perguntas."}
+    finally:
+        db.close()
 
 
 @app.get("/api/debug-admin")
@@ -686,6 +713,97 @@ def ml_search(
     return result
 
 
+def _parse_ml_item_id(url_or_id: str) -> Optional[str]:
+    """Extrai ID do anúncio (MLB123...) de URL do ML ou do próprio ID."""
+    if not url_or_id or not isinstance(url_or_id, str):
+        return None
+    s = url_or_id.strip()
+    match = re.search(r"MLB\d+", s, re.IGNORECASE)
+    if match:
+        return match.group(0).upper()
+    if s.upper().startswith("MLB") and s.upper()[3:].isdigit():
+        return s.upper()
+    return None
+
+
+class AddCompetitorInput(BaseModel):
+    item_id: Optional[str] = None
+    url: Optional[str] = None
+    nickname: Optional[str] = None
+
+
+@app.post("/api/ml/competitors")
+def ml_competitors_add(data: AddCompetitorInput, user: User = Depends(paid_guard)):
+    """Adiciona um concorrente por ID ou URL do anúncio no ML (funciona sem certificação da busca)."""
+    token = get_valid_ml_token(user)
+    if not token or not token.seller_id:
+        raise HTTPException(status_code=403, detail="ml_not_connected")
+    item_id = _parse_ml_item_id(data.item_id or data.url or "")
+    if not item_id:
+        raise HTTPException(status_code=400, detail="Informe o ID do anúncio (ex: MLB123456) ou a URL do produto no Mercado Livre.")
+    item = get_item_by_id(token.access_token, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Anúncio não encontrado no Mercado Livre. Verifique o ID ou a URL.")
+    db = SessionLocal()
+    try:
+        existing = db.query(CompetitorItem).filter(CompetitorItem.user_id == user.id, CompetitorItem.item_id == item_id).first()
+        if existing:
+            if data.nickname is not None:
+                existing.nickname = (data.nickname or "").strip()[:128] or None
+                db.commit()
+            return {"ok": True, "item_id": item_id, "message": "Concorrente já cadastrado; apelido atualizado."}
+        db.add(CompetitorItem(user_id=user.id, item_id=item_id, nickname=(data.nickname or "").strip()[:128] or None))
+        db.commit()
+        return {"ok": True, "item_id": item_id, "message": "Concorrente adicionado."}
+    finally:
+        db.close()
+
+
+@app.get("/api/ml/competitors")
+def ml_competitors_list(user: User = Depends(paid_guard)):
+    """Lista concorrentes cadastrados com detalhes (preço, título, vendidos) do ML."""
+    token = get_valid_ml_token(user)
+    if not token or not token.seller_id:
+        raise HTTPException(status_code=403, detail="ml_not_connected")
+    db = SessionLocal()
+    try:
+        rows = db.query(CompetitorItem).filter(CompetitorItem.user_id == user.id).order_by(CompetitorItem.created_at.desc()).all()
+        items = []
+        for r in rows:
+            detail = get_item_by_id(token.access_token, r.item_id)
+            if detail:
+                items.append({
+                    "item_id": r.item_id,
+                    "nickname": r.nickname,
+                    "title": detail.get("title"),
+                    "price": detail.get("price"),
+                    "sold_quantity": detail.get("sold_quantity", 0),
+                    "permalink": detail.get("permalink"),
+                    "thumbnail": detail.get("thumbnail"),
+                })
+            else:
+                items.append({"item_id": r.item_id, "nickname": r.nickname, "title": None, "price": None, "sold_quantity": None, "permalink": None, "thumbnail": None})
+        return {"items": items}
+    finally:
+        db.close()
+
+
+@app.delete("/api/ml/competitors/{item_id}")
+def ml_competitors_remove(item_id: str, user: User = Depends(paid_guard)):
+    """Remove um concorrente da lista."""
+    item_id = _parse_ml_item_id(item_id) or item_id
+    db = SessionLocal()
+    try:
+        row = db.query(CompetitorItem).filter(CompetitorItem.user_id == user.id, CompetitorItem.item_id == item_id).first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Concorrente não encontrado.")
+        db.delete(row)
+        db.commit()
+        return {"ok": True, "message": "Concorrente removido."}
+    finally:
+        db.close()
+
+
 @app.get("/api/ml/compare/{item_id}")
 def ml_compare(
     item_id: str,
@@ -771,6 +889,288 @@ def ml_metrics(user: User = Depends(paid_guard)):
             "paid": total_orders,
         },
     }
+
+
+# ------------------------------------------------------------------
+# Perguntas nos anúncios ML (webhook + fila aprovação + publicar)
+# ------------------------------------------------------------------
+def _user_by_seller_id(seller_id: str) -> Optional[User]:
+    """Retorna User que possui o seller_id no MlToken."""
+    if not seller_id:
+        return None
+    db = SessionLocal()
+    try:
+        token = db.query(MlToken).filter(MlToken.seller_id == str(seller_id)).first()
+        return db.query(User).filter(User.id == token.user_id).first() if token else None
+    finally:
+        db.close()
+
+
+def _get_few_shot_feedback(user_id: int, item_id: Optional[str], limit: int = 5) -> list:
+    """Últimos (pergunta, resposta_final) do usuário para few-shot."""
+    db = SessionLocal()
+    try:
+        q = (
+            db.query(QuestionAnswerFeedback)
+            .filter(QuestionAnswerFeedback.user_id == user_id)
+            .order_by(QuestionAnswerFeedback.created_at.desc())
+            .limit(limit * 2)
+        )
+        rows = q.all()
+        out = []
+        for r in rows:
+            out.append((r.pergunta_texto or "", r.resposta_final_publicada or ""))
+        return out[:limit]
+    finally:
+        db.close()
+
+
+def _process_ml_question_webhook(question_id: str, user_id: int):
+    """Background: busca pergunta no ML, gera resposta com IA, salva em PendingQuestion."""
+    from app.services.llm_service import run_answer_for_question
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return
+        token = db.query(MlToken).filter(MlToken.user_id == user_id).first()
+        if not token or not token.access_token:
+            return
+        detail = get_question_detail(token.access_token, question_id)
+        if not detail:
+            logger.warning("Webhook question: não foi possível obter detalhe da pergunta %s", question_id)
+            return
+        if db.query(PendingQuestion).filter(PendingQuestion.question_id == question_id).first():
+            return
+        item_id = (detail.get("item_id") or detail.get("item", {}).get("id") if isinstance(detail.get("item"), dict) else None) or None
+        if not item_id and isinstance(detail.get("item"), str):
+            item_id = detail.get("item")
+        pergunta_texto = (detail.get("text") or "").strip()
+        if not pergunta_texto:
+            return
+        item_title = None
+        if item_id:
+            item = get_item_details(token.access_token, item_id)
+            item_title = (item or {}).get("title")
+        few_shot = _get_few_shot_feedback(user_id, item_id)
+        try:
+            resposta_ia = run_answer_for_question(
+                pergunta_texto,
+                item_title=item_title,
+                few_shot_examples=few_shot if few_shot else None,
+            )
+        except Exception as e:
+            logger.exception("IA resposta pergunta: %s", e)
+            resposta_ia = "Obrigado pela mensagem. Retornaremos em breve."
+        db.add(
+            PendingQuestion(
+                user_id=user_id,
+                question_id=question_id,
+                item_id=item_id,
+                item_title=item_title,
+                pergunta_texto=pergunta_texto[:2048],
+                resposta_ia_sugerida=resposta_ia[:2048] if resposta_ia else None,
+                status="pending",
+            )
+        )
+        db.commit()
+        logger.info("Pergunta %s enfileirada para aprovação (user_id=%s)", question_id, user_id)
+        # Notificação (Telegram preferencial, e-mail fallback)
+        try:
+            from app.services.notification_service import send_question_notification, send_question_notification_email
+            u = db.query(User).filter(User.id == user_id).first()
+            sent = False
+            if u and getattr(u, "telegram_chat_id", None):
+                sent = send_question_notification(
+                    u.telegram_chat_id,
+                    pergunta_texto[:200],
+                    resposta_ia[:300] if resposta_ia else "",
+                )
+            if not sent and u and (u.email or "").strip():
+                send_question_notification_email(
+                    (u.email or "").strip(),
+                    pergunta_texto[:200],
+                    resposta_ia[:300] if resposta_ia else "",
+                )
+        except Exception as en:
+            logger.warning("Notificação pergunta: %s", en)
+    except Exception as e:
+        logger.exception("process_ml_question_webhook: %s", e)
+    finally:
+        db.close()
+
+
+@app.post("/api/ml-webhook")
+async def ml_webhook(request: Request, background_tasks: BackgroundTasks):
+    """Recebe notificações do Mercado Livre (tópico questions). Responder 200 em <500ms."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"received": False})
+
+    topic = body.get("topic") or body.get("type")
+    if topic != "questions":
+        return JSONResponse(status_code=200, content={"received": True})
+
+    resource = body.get("resource") or (body.get("data") or {}).get("id") if isinstance(body.get("data"), dict) else None
+    user_id_ml = body.get("user_id") or body.get("seller_id") or (body.get("data") or {}).get("user_id") if isinstance(body.get("data"), dict) else None
+    question_id = None
+    if isinstance(resource, str) and "questions" in resource:
+        question_id = resource.split("/")[-1].strip() or resource.replace("questions/", "").strip()
+    elif isinstance(resource, str):
+        question_id = resource
+    if not question_id:
+        return JSONResponse(status_code=200, content={"received": True})
+
+    user = None
+    if user_id_ml is not None:
+        user = _user_by_seller_id(str(user_id_ml))
+    if not user:
+        db = SessionLocal()
+        try:
+            for token in db.query(MlToken).all():
+                detail = get_question_detail(token.access_token, question_id)
+                if detail:
+                    user = db.query(User).filter(User.id == token.user_id).first()
+                    break
+        finally:
+            db.close()
+    if user:
+        background_tasks.add_task(_process_ml_question_webhook, question_id, user.id)
+    return JSONResponse(status_code=200, content={"received": True})
+
+
+@app.get("/api/ml/questions")
+def ml_questions_list(
+    status: Optional[str] = None,
+    item_id: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    user: User = Depends(paid_guard),
+):
+    """Lista perguntas recebidas nos anúncios do vendedor (API ML)."""
+    token = get_valid_ml_token(user)
+    if not token or not token.seller_id:
+        raise HTTPException(status_code=403, detail="ml_not_connected")
+    result = get_questions_search(
+        token.access_token,
+        seller_id=token.seller_id,
+        item_id=item_id,
+        status=status,
+        limit=limit,
+        offset=offset,
+    )
+    if result is None:
+        raise HTTPException(status_code=500, detail="Erro ao buscar perguntas no Mercado Livre.")
+    return result
+
+
+@app.get("/api/ml/questions/pending")
+def ml_questions_pending(user: User = Depends(paid_guard)):
+    """Lista perguntas com resposta sugerida aguardando aprovação/edição."""
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(PendingQuestion)
+            .filter(PendingQuestion.user_id == user.id, PendingQuestion.status == "pending")
+            .order_by(PendingQuestion.created_at.desc())
+            .all()
+        )
+        return [
+            {
+                "id": r.id,
+                "question_id": r.question_id,
+                "item_id": r.item_id,
+                "item_title": r.item_title,
+                "pergunta_texto": r.pergunta_texto,
+                "resposta_ia_sugerida": r.resposta_ia_sugerida,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ]
+    finally:
+        db.close()
+
+
+class PublishAnswerInput(BaseModel):
+    text: str
+
+
+@app.get("/api/ml/questions/metrics")
+def ml_questions_metrics(user: User = Depends(paid_guard)):
+    """Métricas de atendimento: total de perguntas, respondidas, não respondidas, tempo médio até resposta."""
+    token = get_valid_ml_token(user)
+    if not token or not token.seller_id:
+        raise HTTPException(status_code=403, detail="ml_not_connected")
+    result = get_questions_search(token.access_token, seller_id=token.seller_id, limit=100, offset=0)
+    if result is None:
+        raise HTTPException(status_code=500, detail="Erro ao buscar perguntas no Mercado Livre.")
+    questions = result.get("questions") or []
+    total = len(questions)
+    answered = 0
+    unanswered = 0
+    times_seconds = []
+    for q in questions:
+        status = (q.get("status") or "").upper()
+        if status == "ANSWERED":
+            answered += 1
+            ans = q.get("answer") or {}
+            q_created = q.get("date_created")
+            a_created = ans.get("date_created")
+            if q_created and a_created:
+                try:
+                    from datetime import datetime
+                    q_dt = datetime.fromisoformat(q_created.replace("Z", "+00:00")) if isinstance(q_created, str) else q_created
+                    a_dt = datetime.fromisoformat(a_created.replace("Z", "+00:00")) if isinstance(a_created, str) else a_created
+                    delta = (a_dt - q_dt).total_seconds()
+                    if delta >= 0:
+                        times_seconds.append(delta)
+                except Exception:
+                    pass
+        elif status in ("UNANSWERED", "CLOSED_UNANSWERED"):
+            unanswered += 1
+    avg_seconds = sum(times_seconds) / len(times_seconds) if times_seconds else None
+    return {
+        "total_questions": total,
+        "answered": answered,
+        "unanswered": unanswered,
+        "avg_time_to_answer_seconds": round(avg_seconds, 0) if avg_seconds is not None else None,
+        "avg_time_to_answer_hours": round(avg_seconds / 3600, 2) if avg_seconds is not None else None,
+    }
+
+
+@app.post("/api/ml/questions/{question_id}/publish")
+def ml_question_publish(question_id: str, data: PublishAnswerInput, user: User = Depends(paid_guard)):
+    """Aprova ou edita a resposta e publica no ML. Grava feedback para few-shot."""
+    token = get_valid_ml_token(user)
+    if not token or not token.seller_id:
+        raise HTTPException(status_code=403, detail="ml_not_connected")
+    text = (data.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Texto da resposta é obrigatório.")
+    result = post_answer(token.access_token, question_id, text)
+    if result is None:
+        raise HTTPException(status_code=400, detail="Não foi possível publicar a resposta no Mercado Livre.")
+    db = SessionLocal()
+    try:
+        pending = db.query(PendingQuestion).filter(PendingQuestion.user_id == user.id, PendingQuestion.question_id == question_id).first()
+        if pending:
+            db.add(
+                QuestionAnswerFeedback(
+                    user_id=user.id,
+                    question_id=question_id,
+                    item_id=pending.item_id,
+                    pergunta_texto=pending.pergunta_texto or "",
+                    resposta_ia_sugerida=pending.resposta_ia_sugerida,
+                    resposta_final_publicada=text[:2048],
+                )
+            )
+            pending.status = "published"
+            db.commit()
+        return {"ok": True, "message": "Resposta publicada."}
+    finally:
+        db.close()
 
 
 @app.post("/api/calculate-profit")

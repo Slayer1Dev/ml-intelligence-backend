@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <title>Perguntas nos anúncios — ML Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+  <style>
+    .pending-card { border: 1px solid var(--gray-light); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; background: #fff; }
+    .pending-card .item-title { font-size: 0.85rem; color: var(--gray); margin-bottom: 0.5rem; }
+    .pending-card .pergunta { font-weight: 500; margin-bottom: 0.75rem; }
+    .pending-card .resposta-sugerida { background: #f8fafc; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; font-size: 0.95rem; white-space: pre-wrap; }
+    .pending-card .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .pending-card .btn-approve { background: var(--blue-primary); color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; }
+    .pending-card .btn-approve:hover { background: var(--blue-dark); }
+    .pending-card .btn-edit { background: #64748b; color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; }
+    .pending-card .btn-edit:hover { background: #475569; }
+    .edit-area { margin-top: 0.75rem; display: none; }
+    .edit-area textarea { width: 100%; min-height: 100px; padding: 0.75rem; border: 1px solid var(--gray-light); border-radius: 8px; font-family: inherit; font-size: 0.95rem; }
+    .edit-area .btn-publish { margin-top: 0.5rem; background: #059669; color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; }
+    .edit-area .btn-publish:hover { background: #047857; }
+    .empty-state { text-align: center; padding: 2rem; color: var(--gray); }
+    .meta { font-size: 0.8rem; color: var(--gray); margin-top: 0.5rem; }
+  </style>
+</head>
+<body class="app">
+  <header class="app-header">
+    <a href="dashboard.html" class="app-logo">ML Intelligence</a>
+    <span class="app-user">Olá, vendedor</span>
+    <div id="clerk-user-button"></div>
+  </header>
+
+  <div id="clerk-signin" style="display:none;"></div>
+
+  <div id="app-content" class="app-body">
+    <aside class="app-sidebar">
+      <nav>
+        <a href="dashboard.html">Resumo</a>
+        <a href="financeiro.html" data-paid>Painel Financeiro</a>
+        <a href="calculator.html">Calculadora de Lucro</a>
+        <a href="anuncios.html" data-paid>Meus Anúncios</a>
+        <a href="performance.html" data-paid>Performance</a>
+        <a href="concorrentes.html" data-paid>Concorrentes</a>
+        <a href="perguntas-anuncios.html" class="active" data-paid>Perguntas nos anúncios</a>
+        <a href="ia-assistente.html" data-paid>IA Assistente</a>
+        <span id="admin-link-wrap" style="display:none;"><hr style="margin: 0.5rem 0; border-color: var(--gray-light);"><a href="admin.html">⚙️ Admin</a></span>
+      </nav>
+    </aside>
+
+    <main class="app-main">
+      <h1>Perguntas nos anúncios</h1>
+      <p class="subtitle">Perguntas feitas por compradores nos seus anúncios do Mercado Livre. Aprove ou edite a resposta sugerida pela IA e publique.</p>
+
+      <div id="ml-not-connected" class="card" style="display: none;">
+        <p><strong>Conecte sua conta do Mercado Livre</strong> no dashboard para receber e responder perguntas dos seus anúncios.</p>
+        <a href="dashboard.html" class="button" style="margin-top: 1rem;">Ir ao dashboard</a>
+      </div>
+
+      <div id="upgrade-required" class="card" style="display: none;">
+        <div class="coming-soon">
+          <h2>Plano Pro necessário</h2>
+          <p>Assine o plano para acessar as perguntas dos anúncios.</p>
+          <a href="dashboard.html" class="button" style="margin-top: 1rem;">Ver planos</a>
+        </div>
+      </div>
+
+      <div id="pending-container" style="display: none;">
+        <!-- Vincular Telegram para notificações -->
+        <div class="card" style="margin-bottom: 1.5rem;">
+          <h2 style="font-size: 1.1rem; margin-top: 0;">Notificações no celular (Telegram)</h2>
+          <p id="telegram-status" style="color: var(--gray); font-size: 0.9rem; margin-bottom: 0.75rem;"></p>
+          <div id="telegram-link-box" style="display: none;">
+            <p style="font-size: 0.85rem; color: var(--gray); margin-bottom: 0.5rem;">1. Abra seu bot no Telegram e envie qualquer mensagem (ex: /start).<br>2. Obtenha seu Chat ID em <a href="https://t.me/userinfobot" target="_blank" rel="noopener">@userinfobot</a> (envie /start e ele mostra o Id).<br>3. Cole o número abaixo e clique em Vincular.</p>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+              <input type="text" id="telegram-chat-id" placeholder="Ex: 123456789" style="padding: 0.5rem 0.75rem; border: 1px solid var(--gray-light); border-radius: 8px; width: 180px;">
+              <button type="button" id="btn-link-telegram" class="btn-approve">Vincular</button>
+            </div>
+            <p id="telegram-msg" style="font-size: 0.85rem; margin-top: 0.5rem;"></p>
+          </div>
+        </div>
+        <h2 style="font-size: 1.1rem; margin-bottom: 1rem;">Aguardando sua aprovação</h2>
+        <div id="pending-list"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="clerk-auth.js"></script>
+  <script src="app-nav.js"></script>
+  <script>
+    const API_BASE = window.location.origin;
+
+    async function checkAccess() {
+      try {
+        const meRes = await authFetch(API_BASE + '/api/me');
+        const me = await meRes.json();
+        if (me.plan !== 'active' && !me.isAdmin) {
+          document.getElementById('upgrade-required').style.display = 'block';
+          document.getElementById('pending-container').style.display = 'none';
+          document.getElementById('ml-not-connected').style.display = 'none';
+          return false;
+        }
+        const statusRes = await authFetch(API_BASE + '/api/ml-status');
+        const status = await statusRes.json();
+        if (!status.connected) {
+          document.getElementById('ml-not-connected').style.display = 'block';
+          document.getElementById('upgrade-required').style.display = 'none';
+          document.getElementById('pending-container').style.display = 'none';
+          return false;
+        }
+        document.getElementById('ml-not-connected').style.display = 'none';
+        document.getElementById('upgrade-required').style.display = 'none';
+        document.getElementById('pending-container').style.display = 'block';
+        await updateTelegramUI(me);
+        return true;
+      } catch (e) {
+        console.error(e);
+        document.getElementById('upgrade-required').style.display = 'block';
+        document.getElementById('pending-container').style.display = 'none';
+        return false;
+      }
+    }
+
+    async function loadPending() {
+      const listEl = document.getElementById('pending-list');
+      listEl.innerHTML = '<p>Carregando...</p>';
+      try {
+        const res = await authFetch(API_BASE + '/api/ml/questions/pending');
+        const items = await res.json();
+        if (!res.ok) throw new Error(items.detail || 'Erro');
+        if (!items.length) {
+          listEl.innerHTML = '<div class="empty-state">Nenhuma pergunta aguardando aprovação. Quando um comprador perguntar nos seus anúncios, a IA sugerirá uma resposta e ela aparecerá aqui.</div>';
+          return;
+        }
+        listEl.innerHTML = items.map(function (p) {
+          const created = p.created_at ? new Date(p.created_at).toLocaleString('pt-BR') : '';
+          const editId = 'edit-' + p.question_id;
+          return (
+            '<div class="pending-card" data-question-id="' + (p.question_id || '') + '">' +
+              (p.item_title ? '<div class="item-title">Anúncio: ' + escapeHtml(p.item_title) + '</div>' : '') +
+              '<div class="pergunta">' + escapeHtml(p.pergunta_texto || '') + '</div>' +
+              '<div class="resposta-sugerida">' + escapeHtml(p.resposta_ia_sugerida || '') + '</div>' +
+              '<div class="meta">' + created + '</div>' +
+              '<div class="actions">' +
+                '<button type="button" class="btn-approve" data-question-id="' + (p.question_id || '') + '" data-text="' + escapeAttr(p.resposta_ia_sugerida || '') + '">Aprovar e publicar</button>' +
+                '<button type="button" class="btn-edit" data-question-id="' + (p.question_id || '') + '" data-suggested="' + escapeAttr(p.resposta_ia_sugerida || '') + '">Editar e publicar</button>' +
+              '</div>' +
+              '<div class="edit-area" id="' + editId + '">' +
+                '<textarea rows="4" placeholder="Edite a resposta..."></textarea>' +
+                '<div><button type="button" class="btn-publish">Publicar resposta</button></div>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join('');
+
+        listEl.querySelectorAll('.btn-approve').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            const questionId = btn.getAttribute('data-question-id');
+            const text = (btn.getAttribute('data-text') || '').replace(/&quot;/g, '"');
+            publishAnswer(questionId, text, btn);
+          });
+        });
+        listEl.querySelectorAll('.btn-edit').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            const questionId = btn.getAttribute('data-question-id');
+            const suggested = (btn.getAttribute('data-suggested') || '').replace(/&quot;/g, '"');
+            const card = btn.closest('.pending-card');
+            const editArea = card.querySelector('.edit-area');
+            const textarea = editArea.querySelector('textarea');
+            textarea.value = suggested;
+            editArea.style.display = 'block';
+            const publishBtn = editArea.querySelector('.btn-publish');
+            publishBtn.onclick = function () {
+              publishAnswer(questionId, textarea.value.trim(), publishBtn);
+            };
+          });
+        });
+      } catch (e) {
+        listEl.innerHTML = '<p style="color: #dc2626;">Erro ao carregar: ' + (e.message || 'Tente novamente.') + '</p>';
+      }
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+    function escapeAttr(s) {
+      return escapeHtml(s).replace(/"/g, '&quot;');
+    }
+
+    async function publishAnswer(questionId, text, buttonEl) {
+      if (!text) {
+        alert('Digite a resposta.');
+        return;
+      }
+      buttonEl.disabled = true;
+      if (buttonEl.textContent) buttonEl.textContent = 'Publicando...';
+      try {
+        const res = await authFetch(API_BASE + '/api/ml/questions/' + encodeURIComponent(questionId) + '/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Erro ao publicar');
+        var card = document.querySelector('.pending-card[data-question-id="' + questionId + '"]');
+        if (card) card.remove();
+        var list = document.getElementById('pending-list');
+        if (list.querySelectorAll('.pending-card').length === 0) {
+          list.innerHTML = '<div class="empty-state">Nenhuma pergunta aguardando aprovação.</div>';
+        }
+      } catch (e) {
+        alert('Erro: ' + (e.message || 'Tente novamente.'));
+      } finally {
+        buttonEl.disabled = false;
+        if (buttonEl.classList.contains('btn-publish')) buttonEl.textContent = 'Publicar resposta';
+      }
+    }
+
+    async function updateTelegramUI(me) {
+      var statusEl = document.getElementById('telegram-status');
+      var box = document.getElementById('telegram-link-box');
+      var msgEl = document.getElementById('telegram-msg');
+      if (!statusEl || !box) return;
+      if (me && me.telegramLinked) {
+        statusEl.textContent = 'Telegram vinculado. Você receberá notificações quando houver nova pergunta nos seus anúncios.';
+        box.style.display = 'none';
+        msgEl.textContent = '';
+      } else {
+        statusEl.textContent = 'Vincule seu Telegram para receber no celular: pergunta do comprador + resposta sugerida pela IA.';
+        box.style.display = 'block';
+      }
+    }
+
+    async function linkTelegram() {
+      var chatId = (document.getElementById('telegram-chat-id').value || '').trim();
+      var msgEl = document.getElementById('telegram-msg');
+      var btn = document.getElementById('btn-link-telegram');
+      if (!chatId) {
+        msgEl.textContent = 'Informe o Chat ID.';
+        msgEl.style.color = '#dc2626';
+        return;
+      }
+      btn.disabled = true;
+      msgEl.textContent = 'Salvando...';
+      msgEl.style.color = '';
+      try {
+        var res = await authFetch(API_BASE + '/api/me/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId })
+        });
+        var data = await res.json();
+        if (!res.ok) {
+          msgEl.textContent = data.detail || 'Erro ao vincular.';
+          msgEl.style.color = '#dc2626';
+          return;
+        }
+        msgEl.textContent = data.message || 'Telegram vinculado.';
+        msgEl.style.color = '#059669';
+        var meRes = await authFetch(API_BASE + '/api/me');
+        var me = await meRes.json();
+        await updateTelegramUI(me);
+      } catch (e) {
+        msgEl.textContent = 'Erro de conexão.';
+        msgEl.style.color = '#dc2626';
+      }
+      btn.disabled = false;
+    }
+
+    async function init() {
+      await initClerkAuth({ signInContainerId: 'clerk-signin', userButtonContainerId: 'clerk-user-button', appContentId: 'app-content' });
+      if (!window.ClerkAuth?.signedIn) return;
+      if (await checkAccess()) {
+        var meRes = await authFetch(API_BASE + '/api/me');
+        var me = await meRes.json();
+        updateTelegramUI(me);
+        document.getElementById('btn-link-telegram')?.addEventListener('click', linkTelegram);
+        loadPending();
+      }
+    }
+    init();
+  </script>
+</body>
+</html>

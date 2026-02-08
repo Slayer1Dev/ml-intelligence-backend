@@ -21,8 +21,13 @@
 4. A página envia o `code` ao backend, que troca por tokens e grava no banco
 5. Usuário é redirecionado ao dashboard com mensagem de sucesso
 
-## 4. Próximos passos (a implementar)
+## 4. Webhook de perguntas (implementado)
 
-- Endpoint `/api/ml-webhook` para notificações (Orders, Items)
-- Chamadas à API do ML para buscar anúncios, vendas, métricas
-- Atualizar painéis com dados reais do Mercado Livre
+- **URL de notificações (tópico `questions`):** `https://seu-dominio/api/ml-webhook`
+- Cadastre no DevCenter do app ML a URL acima e assine o tópico **questions** para receber avisos de novas perguntas nos anúncios.
+- O backend responde 200 em menos de 500 ms e processa em background (gera resposta com IA, enfileira para aprovação, envia notificação Telegram/e-mail).
+
+## 5. Outros endpoints
+
+- Chamadas à API do ML para buscar anúncios, vendas, métricas, **perguntas e respostas** (já implementados).
+- Concorrentes: busca por termo (pode retornar 403 sem certificação); **adicionar concorrente por link/ID** (funciona sem certificação).

@@ -217,3 +217,90 @@ def get_multiple_items(access_token: str, item_ids: List[str]) -> Optional[List[
             items.append(obj["body"])
     
     return items
+
+
+# ------------------------------------------------------------------
+# Perguntas e respostas nos anúncios (API ML)
+# ------------------------------------------------------------------
+def get_questions_search(
+    access_token: str,
+    seller_id: Optional[str] = None,
+    item_id: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> Optional[dict]:
+    """Lista perguntas recebidas nos anúncios do vendedor.
+    GET /questions/search?seller_id=... ou ?item=...&api_version=4
+    """
+    if not access_token or (not seller_id and not item_id):
+        return None
+    headers = {"Authorization": f"Bearer {access_token}"}
+    params = {"api_version": "4", "limit": min(limit, 50), "offset": offset}
+    if seller_id:
+        params["seller_id"] = seller_id
+    if item_id:
+        params["item"] = item_id
+    if status:
+        params["status"] = status
+    try:
+        resp = requests.get(f"{ML_API}/questions/search", headers=headers, params=params, timeout=15)
+        if resp.status_code != 200:
+            _log.warning("ML questions search failed: status=%s body=%s", resp.status_code, resp.text[:200])
+            return None
+        return resp.json()
+    except requests.RequestException as e:
+        _log.warning("ML questions search error: %s", e)
+        return None
+
+
+def get_question_detail(access_token: str, question_id: str) -> Optional[dict]:
+    """Detalhe de uma pergunta (inclui dados do comprador quando aplicável)."""
+    if not access_token or not question_id:
+        return None
+    headers = {"Authorization": f"Bearer {access_token}"}
+    try:
+        resp = requests.get(f"{ML_API}/questions/{question_id}", headers=headers, timeout=15)
+        if resp.status_code != 200:
+            return None
+        return resp.json()
+    except requests.RequestException as e:
+        _log.warning("ML question detail error: %s", e)
+        return None
+
+
+def post_answer(access_token: str, question_id: str, text: str) -> Optional[dict]:
+    """Publica resposta a uma pergunta. POST /answers."""
+    if not access_token or not question_id or not (text or "").strip():
+        return None
+    headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
+    payload = {"question_id": question_id, "text": (text or "").strip()}
+    try:
+        resp = requests.post(f"{ML_API}/answers", headers=headers, json=payload, timeout=15)
+        if resp.status_code not in (200, 201):
+            _log.warning("ML post answer failed: status=%s body=%s", resp.status_code, resp.text[:200])
+            return None
+        return resp.json() if resp.text else {}
+    except requests.RequestException as e:
+        _log.warning("ML post answer error: %s", e)
+        return None
+
+
+def get_item_by_id(access_token: Optional[str], item_id: str) -> Optional[dict]:
+    """Busca um item por ID. Com token retorna detalhes do dono; sem token pode funcionar para itens públicos (GET /items/{id})."""
+    if not item_id:
+        return None
+    headers = {}
+    if access_token:
+        headers["Authorization"] = f"Bearer {access_token}"
+    if not headers:
+        headers["User-Agent"] = "MLIntelligence/1.0 (https://mercadoinsights.online)"
+    try:
+        resp = requests.get(f"{ML_API}/items/{item_id}", headers=headers, timeout=15)
+        if resp.status_code != 200:
+            _log.warning("ML get item %s failed: status=%s", item_id, resp.status_code)
+            return None
+        return resp.json()
+    except requests.RequestException as e:
+        _log.warning("ML get item error: %s", e)
+        return None
