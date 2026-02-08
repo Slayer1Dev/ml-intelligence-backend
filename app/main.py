@@ -66,7 +66,7 @@ app.add_middleware(
 # ------------------------------------------------------------------
 # *Se der ImportError, colocar os módulos no PYTHONPATH ou ajustar import relativo*
 from app.database import SessionLocal, init_db
-from app.models import MlToken, Subscription, User
+from app.models import ItemCost, MlToken, Subscription, User
 from app.services.sheets_reader import read_sheet
 from app.services.normalizer import normalize_concorrentes
 from app.services.ai_agent import analyze_market, analyze_uploaded_sheet
@@ -140,6 +140,20 @@ class ProfitInput(BaseModel):
     frete: float = 20.0
     taxa_percentual: float = 11.0
     imposto_percentual: float = 5.0
+
+
+class ItemCostUpdate(BaseModel):
+    item_id: str
+    sku: Optional[str] = None
+    custo_produto: Optional[float] = None
+    embalagem: Optional[float] = None
+    frete: Optional[float] = None
+    taxa_pct: Optional[float] = None
+    imposto_pct: Optional[float] = None
+
+
+class ItemCostsBatch(BaseModel):
+    items: List[ItemCostUpdate]
 
 
 # ------------------------------------------------------------------
@@ -597,6 +611,115 @@ def calculate_profit_endpoint(
         "margem_percentual": round(margem, 2),
         "total_despesas": round(taxa + imposto + data.frete, 2),
     }
+
+
+# ------------------------------------------------------------------
+# Painel financeiro integrado ML (dados via API + custos no banco)
+# ------------------------------------------------------------------
+@app.get("/api/financial-panel")
+def financial_panel(user: User = Depends(paid_guard)):
+    """Retorna dados financeiros dos anúncios do usuário via API ML + custos salvos no banco."""
+    return _compute_financial_panel(user)
+
+
+@app.post("/api/financial-panel/costs")
+def save_financial_costs(data: ItemCostsBatch, user: User = Depends(paid_guard)):
+    """Salva/atualiza custos por anúncio no banco."""
+    db = SessionLocal()
+    try:
+        for upd in data.items:
+            c = db.query(ItemCost).filter(ItemCost.user_id == user.id, ItemCost.item_id == upd.item_id).first()
+            if c is None:
+                c = ItemCost(user_id=user.id, item_id=upd.item_id)
+                db.add(c)
+            if upd.sku is not None:
+                c.sku = upd.sku
+            if upd.custo_produto is not None:
+                c.custo_produto = upd.custo_produto
+            if upd.embalagem is not None:
+                c.embalagem = upd.embalagem
+            if upd.frete is not None:
+                c.frete = upd.frete
+            if upd.taxa_pct is not None:
+                c.taxa_pct = upd.taxa_pct
+            if upd.imposto_pct is not None:
+                c.imposto_pct = upd.imposto_pct
+        db.commit()
+        return {"ok": True, "saved": len(data.items)}
+    finally:
+        db.close()
+
+
+def _compute_financial_panel(user: User) -> dict:
+    """Lógica interna do painel financeiro (reutilizada por ai-insights)."""
+    token = get_valid_ml_token(user)
+    if not token or not token.seller_id:
+        raise HTTPException(status_code=403, detail="ml_not_connected")
+    result = get_user_items(token.access_token, token.seller_id, status="all", limit=50)
+    if not result or not result.get("results"):
+        return {"metrics": {"total_listings": 0, "profit_total": 0, "margin_mean": 0, "missing_cost": 0}, "items": [], "top_profit": []}
+    item_ids = result["results"][:50]
+    items_data = get_multiple_items(token.access_token, item_ids) or []
+    db = SessionLocal()
+    try:
+        costs = {c.item_id: c for c in db.query(ItemCost).filter(ItemCost.user_id == user.id).all()}
+    finally:
+        db.close()
+    DEFAULT_TAXA, DEFAULT_IMPOSTO = 13.0, 5.0
+    items = []
+    for it in items_data:
+        c = costs.get(it.get("id"))
+        price = float(it.get("price") or 0)
+        taxa = (c.taxa_pct if c and c.taxa_pct is not None else None) or DEFAULT_TAXA
+        imposto = (c.imposto_pct if c and c.imposto_pct is not None else None) or DEFAULT_IMPOSTO
+        custo = c.custo_produto if c and c.custo_produto is not None else None
+        emb, frt = (c.embalagem if c else 0) or 0, (c.frete if c else 0) or 0
+        fee_amount = price * (taxa / 100)
+        imp_amount = price * (imposto / 100)
+        cost_total = (custo or 0) + fee_amount + imp_amount + emb + frt
+        profit = price - cost_total if custo is not None else None
+        margin = (profit / price * 100) if profit is not None and price else None
+        sku = (c.sku if c else None) or it.get("seller_custom_field") or it.get("id")
+        items.append({"id": it.get("id"), "title": it.get("title"), "sku": sku, "price": price, "sold_quantity": it.get("sold_quantity", 0), "available_quantity": it.get("available_quantity", 0), "status": it.get("status"), "custo_produto": custo, "embalagem": emb, "frete": frt, "taxa_pct": taxa, "imposto_pct": imposto, "fee_amount": round(fee_amount, 2), "cost_total": round(cost_total, 2), "profit": round(profit, 2) if profit is not None else None, "margin_pct": round(margin, 2) if margin is not None else None})
+    valid_profits = [i for i in items if i["profit"] is not None]
+    total_listings = len(items)
+    active_listings = sum(1 for i in items if str(i.get("status", "")).lower() == "active")
+    total_stock = sum(i.get("available_quantity", 0) or 0 for i in items)
+    avg_price = sum(i["price"] for i in items) / total_listings if total_listings else 0
+    avg_fee = sum(i["taxa_pct"] for i in items) / total_listings if total_listings else DEFAULT_TAXA
+    profit_mean = sum(i["profit"] for i in valid_profits) / len(valid_profits) if valid_profits else 0
+    margin_mean = sum(i["margin_pct"] for i in valid_profits) / len(valid_profits) if valid_profits else 0
+    profit_total = sum(i["profit"] for i in valid_profits)
+    fee_total = sum(i["fee_amount"] for i in items)
+    missing_cost = sum(1 for i in items if i["custo_produto"] is None)
+    top_profit = sorted(valid_profits, key=lambda x: x["profit"], reverse=True)[:10]
+    return {"metrics": {"total_listings": total_listings, "active_listings": active_listings, "total_stock": total_stock, "avg_price": round(avg_price, 2), "avg_fee_pct": round(avg_fee, 2), "profit_mean": round(profit_mean, 2), "margin_mean": round(margin_mean, 2), "profit_total": round(profit_total, 2), "fee_total": round(fee_total, 2), "missing_cost": missing_cost}, "items": items, "top_profit": [{"ITEM_ID": i["id"], "SKU_STR": i["sku"], "TITLE": i["title"], "PRICE_NUM": i["price"], "COST": i["custo_produto"], "PROFIT": i["profit"], "MARGIN_PCT": i["margin_pct"]} for i in top_profit]}
+
+
+@app.post("/api/financial-panel/ai-insights")
+def financial_ai_insights(user: User = Depends(paid_guard)):
+    """Gera insights de IA sobre o painel financeiro."""
+    try:
+        from app.services.llm_service import run_market_analysis
+    except Exception:
+        raise HTTPException(status_code=503, detail="IA não configurada. Defina OPENAI_API_KEY.")
+    panel = _compute_financial_panel(user)
+    items = panel.get("items", [])
+    metrics = panel.get("metrics", {})
+    prompt = f"""Analise os dados financeiros de um vendedor do Mercado Livre e retorne um JSON com:
+- "resumo": string curta (1-2 frases) sobre a saúde financeira geral
+- "alertas": lista de strings com problemas (ex: muitos itens sem custo, margem baixa)
+- "sugestoes": lista de strings com recomendações de melhoria
+- "top_oportunidades": lista de até 3 strings com as maiores oportunidades
+
+Dados: {len(items)} anúncios, lucro total R$ {metrics.get('profit_total', 0)}, margem média {metrics.get('margin_mean', 0)}%, {metrics.get('missing_cost', 0)} itens sem custo cadastrado.
+Retorne APENAS o JSON, sem markdown."""
+    try:
+        out = run_market_analysis(prompt)
+        return out
+    except Exception as e:
+        logger.exception("Erro ao gerar insights IA: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/financial-dashboard")

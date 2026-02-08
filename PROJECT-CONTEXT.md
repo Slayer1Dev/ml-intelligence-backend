@@ -44,6 +44,7 @@
 | `services/stripe_service.py` | (Legado) não usado — migrado para Mercado Pago |
 | `services/user_service.py` | `get_or_create_user` (Clerk → banco) |
 | `services/sheet_processor.py`, `ai_agent.py`, `llm_service.py` | Processamento de planilhas, IA |
+| `models.py` → `ItemCost` | Custos por anúncio (embalagem, frete, imposto, custo) |
 
 ### Frontend (`frontend/`)
 

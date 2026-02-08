@@ -38,33 +38,34 @@ def extract_json(text: str):
 
 
 def run_market_analysis(prompt: str):
+    """Envia prompt ao LLM e retorna JSON. Tenta Responses API, fallback para Chat Completions."""
     logger.info("Enviando prompt ao LLM")
-
     client = _get_client()
-    response = client.responses.create(
-        model="gpt-4.1-mini",
-        input=prompt
-    )
-
-    # ✅ EXTRAÇÃO CORRETA DO TEXTO
     raw_text = ""
 
-    for output in response.output:
-        if output.type == "message":
-            for content in output.content:
-                if content.type == "output_text":
-                    raw_text += content.text
+    try:
+        response = client.responses.create(model="gpt-4.1-mini", input=prompt)
+        for output in response.output:
+            if output.type == "message":
+                for content in output.content:
+                    if content.type == "output_text":
+                        raw_text += content.text
+    except Exception as e1:
+        logger.warning("Responses API falhou (%s), tentando Chat Completions", e1)
+        try:
+            r = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw_text = (r.choices[0].message.content or "").strip()
+        except Exception as e2:
+            raise RuntimeError(f"LLM indisponível: {e2}") from e2
 
     if not raw_text:
         raise RuntimeError("LLM retornou resposta vazia")
-
     logger.debug("Resposta bruta do LLM:\n%s", raw_text)
-
     try:
         return extract_json(raw_text)
     except Exception as e:
         logger.exception("Falha ao converter resposta do LLM para JSON")
-        return {
-            "error": "Resposta da IA não é JSON válido",
-            "raw": raw_text
-        }
+        return {"error": "Resposta da IA não é JSON válido", "raw": raw_text}

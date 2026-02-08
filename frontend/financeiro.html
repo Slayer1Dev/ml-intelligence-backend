@@ -10,30 +10,21 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css">
   <style>
-    .upload-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 1rem;
-    }
-    .metric-value {
-      font-size: 1.6rem;
-      font-weight: 700;
-      color: var(--blue-primary);
-      margin-top: 0.25rem;
-    }
-    .metric-label {
-      color: var(--gray);
-      font-size: 0.9rem;
-    }
-    .chart-card {
-      padding: 1.5rem;
-    }
+    .upload-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+    .metric-value { font-size: 1.6rem; font-weight: 700; color: var(--blue-primary); margin-top: 0.25rem; }
+    .metric-label { color: var(--gray); font-size: 0.9rem; }
+    .chart-card { padding: 1.5rem; }
+    .tab-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .tab-btn { padding: 0.5rem 1rem; border: 1px solid var(--gray-light); background: #fff; border-radius: 6px; cursor: pointer; }
+    .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+    .cost-input { width: 70px; padding: 0.3rem; }
+    #items-table td, #items-table th { padding: 0.5rem; font-size: 0.9rem; }
   </style>
 </head>
 <body class="app">
   <header class="app-header">
     <a href="dashboard.html" class="app-logo">ML Intelligence</a>
-    <span class="app-user">Ola, vendedor</span>
+    <span class="app-user">Olá, vendedor</span>
     <div id="clerk-user-button"></div>
   </header>
 
@@ -45,7 +36,7 @@
         <a href="dashboard.html">Resumo</a>
         <a href="financeiro.html" class="active">Painel Financeiro</a>
         <a href="calculator.html">Calculadora de Lucro</a>
-        <a href="anuncios.html">Meus Anuncios</a>
+        <a href="anuncios.html">Meus Anúncios</a>
         <a href="performance.html">Performance</a>
         <a href="concorrentes.html">Concorrentes</a>
         <span id="admin-link-wrap" style="display:none;"><hr style="margin: 0.5rem 0; border-color: var(--gray-light);"><a href="admin.html">⚙️ Admin</a></span>
@@ -54,72 +45,70 @@
 
     <main class="app-main">
       <h1>Painel Financeiro</h1>
-      <p class="subtitle">Gere indicadores financeiros a partir da planilha do Mercado Livre.</p>
+      <p class="subtitle">Dados do Mercado Livre em tempo real. Cadastre custos por anúncio e acompanhe lucro e margem.</p>
 
-      <div class="card">
-        <h3 style="margin-bottom: 1rem; color: var(--blue-primary);">Importar dados</h3>
-        <form id="financeForm" class="upload-grid">
-          <div class="form-group">
-            <label>Planilha do Mercado Livre (XLSX)</label>
-            <input type="file" id="mlFile" accept=".xlsx" required>
-          </div>
-          <div class="form-group">
-            <label>Planilha de custos (opcional)</label>
-            <input type="file" id="costFile" accept=".xlsx,.csv">
-          </div>
-          <div class="form-group">
-            <label>Embalagem (R$)</label>
-            <input type="text" inputmode="decimal" id="embalagem" value="1">
-          </div>
-          <div class="form-group">
-            <label>Frete (R$)</label>
-            <input type="text" inputmode="decimal" id="frete" value="0">
-          </div>
-          <div class="form-group" style="align-self: end;">
-            <button type="submit" class="btn btn-primary" style="width: 100%;">Gerar Painel</button>
-          </div>
-        </form>
-        <p id="financeError" style="margin-top: 1rem; color: #dc2626; display: none;"></p>
+      <div class="tab-row">
+        <button type="button" class="tab-btn active" data-tab="ml">Do Mercado Livre (API)</button>
+        <button type="button" class="tab-btn" data-tab="planilha">Importar planilha</button>
       </div>
+
+      <!-- Modo ML -->
+      <div id="tab-ml" class="tab-content">
+        <div id="ml-not-connected" class="card" style="display: none;">
+          <p>Conecte sua conta do Mercado Livre no <a href="dashboard.html">dashboard</a> para carregar os dados automaticamente.</p>
+        </div>
+        <div id="ml-loaded" style="display: none;">
+          <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+              <button type="button" id="btn-refresh-ml" class="button">Atualizar dados do ML</button>
+              <button type="button" id="btn-ai-insights" class="button" style="background: #7c3aed;">Insights de IA</button>
+              <span id="last-update" style="color: var(--gray); font-size: 0.9rem;"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modo planilha -->
+      <div id="tab-planilha" class="tab-content" style="display: none;">
+        <div class="card">
+          <h3 style="margin-bottom: 1rem; color: var(--blue-primary);">Importar dados</h3>
+          <form id="financeForm" class="upload-grid">
+            <div class="form-group">
+              <label>Planilha do Mercado Livre (XLSX)</label>
+              <input type="file" id="mlFile" accept=".xlsx" required>
+            </div>
+            <div class="form-group">
+              <label>Planilha de custos (opcional)</label>
+              <input type="file" id="costFile" accept=".xlsx,.csv">
+            </div>
+            <div class="form-group">
+              <label>Embalagem (R$)</label>
+              <input type="text" inputmode="decimal" id="embalagem" value="1">
+            </div>
+            <div class="form-group">
+              <label>Frete (R$)</label>
+              <input type="text" inputmode="decimal" id="frete" value="0">
+            </div>
+            <div class="form-group" style="align-self: end;">
+              <button type="submit" class="btn btn-primary" style="width: 100%;">Gerar Painel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <p id="financeError" style="margin-top: 1rem; color: #dc2626; display: none;"></p>
 
       <div id="metricsSection" style="display: none;">
         <div class="grid">
-          <div class="card">
-            <div class="metric-label">Anuncios totais</div>
-            <div class="metric-value" id="metricTotal">-</div>
-          </div>
-          <div class="card">
-            <div class="metric-label">Anuncios ativos</div>
-            <div class="metric-value" id="metricActive">-</div>
-          </div>
-          <div class="card">
-            <div class="metric-label">Estoque total</div>
-            <div class="metric-value" id="metricStock">-</div>
-          </div>
-          <div class="card">
-            <div class="metric-label">Preco medio (R$)</div>
-            <div class="metric-value" id="metricPrice">-</div>
-          </div>
-          <div class="card">
-            <div class="metric-label">Taxa media (%)</div>
-            <div class="metric-value" id="metricFee">-</div>
-          </div>
-          <div class="card">
-            <div class="metric-label">Lucro medio (R$)</div>
-            <div class="metric-value" id="metricProfitMean">-</div>
-          </div>
-          <div class="card">
-            <div class="metric-label">Margem media (%)</div>
-            <div class="metric-value" id="metricMarginMean">-</div>
-          </div>
-          <div class="card">
-            <div class="metric-label">Lucro total (R$)</div>
-            <div class="metric-value" id="metricProfitTotal">-</div>
-          </div>
-          <div class="card">
-            <div class="metric-label">Itens sem custo</div>
-            <div class="metric-value" id="metricMissingCost">-</div>
-          </div>
+          <div class="card"><div class="metric-label">Anúncios totais</div><div class="metric-value" id="metricTotal">-</div></div>
+          <div class="card"><div class="metric-label">Anúncios ativos</div><div class="metric-value" id="metricActive">-</div></div>
+          <div class="card"><div class="metric-label">Estoque total</div><div class="metric-value" id="metricStock">-</div></div>
+          <div class="card"><div class="metric-label">Preço médio (R$)</div><div class="metric-value" id="metricPrice">-</div></div>
+          <div class="card"><div class="metric-label">Taxa média (%)</div><div class="metric-value" id="metricFee">-</div></div>
+          <div class="card"><div class="metric-label">Lucro médio (R$)</div><div class="metric-value" id="metricProfitMean">-</div></div>
+          <div class="card"><div class="metric-label">Margem média (%)</div><div class="metric-value" id="metricMarginMean">-</div></div>
+          <div class="card"><div class="metric-label">Lucro total (R$)</div><div class="metric-value" id="metricProfitTotal">-</div></div>
+          <div class="card"><div class="metric-label">Itens sem custo</div><div class="metric-value" id="metricMissingCost">-</div></div>
         </div>
 
         <div class="card chart-card" style="margin-top: 1.5rem;">
@@ -128,21 +117,35 @@
         </div>
 
         <div class="card" style="margin-top: 1.5rem;">
-          <h3 style="margin-bottom: 1rem; color: var(--blue-primary);">Ranking de lucro</h3>
-          <div class="table-wrap">
-            <table class="table" id="profitTable">
+          <h3 style="margin-bottom: 1rem; color: var(--blue-primary);">Anúncios e custos (edite e salve)</h3>
+          <div id="profit-table-simple" style="display: none;">
+            <table class="table" id="profitTable"><thead><tr><th>SKU</th><th>Título</th><th>Preço</th><th>Lucro</th><th>Margem</th></tr></thead><tbody></tbody></table>
+          </div>
+          <div class="table-wrap" style="overflow-x: auto;" id="items-table-wrap">
+            <table class="table" id="items-table">
               <thead>
                 <tr>
                   <th>SKU</th>
-                  <th>Titulo</th>
-                  <th>Preco</th>
-                  <th>Lucro (R$)</th>
-                  <th>Margem (%)</th>
+                  <th>Título</th>
+                  <th>Preço</th>
+                  <th>Custo (R$)</th>
+                  <th>Embalagem</th>
+                  <th>Frete</th>
+                  <th>Taxa %</th>
+                  <th>Imposto %</th>
+                  <th>Lucro</th>
+                  <th>Margem</th>
                 </tr>
               </thead>
               <tbody></tbody>
             </table>
           </div>
+          <button type="button" id="btn-save-costs" class="button" style="margin-top: 1rem;">Salvar alterações</button>
+        </div>
+
+        <div id="ai-insights-box" class="card" style="margin-top: 1.5rem; display: none;">
+          <h3 style="margin-bottom: 1rem;">Insights de IA</h3>
+          <div id="ai-insights-content"></div>
         </div>
       </div>
     </main>
@@ -154,110 +157,200 @@
   <script>
     const API_URL = window.location.origin;
     let chart;
+    let currentPanelData = null;
 
     function parseNum(val) {
-      if (!val) return 0;
+      if (val === '' || val === null || val === undefined) return null;
       const s = String(val).trim().replace(',', '.');
-      return parseFloat(s) || 0;
+      const n = parseFloat(s);
+      return isNaN(n) ? null : n;
     }
 
     function setText(id, value) {
-      document.getElementById(id).textContent = value;
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
     }
 
-    document.getElementById('financeForm').addEventListener('submit', async (e) => {
+    function fmt(v) {
+      if (v == null) return '-';
+      return typeof v === 'number' ? v.toFixed(2).replace('.', ',') : v;
+    }
+
+    function renderMetrics(m) {
+      setText('metricTotal', m.total_listings);
+      setText('metricActive', m.active_listings);
+      setText('metricStock', m.total_stock);
+      setText('metricPrice', `R$ ${fmt(m.avg_price)}`);
+      setText('metricFee', `${fmt(m.avg_fee_pct)}%`);
+      setText('metricProfitMean', `R$ ${fmt(m.profit_mean)}`);
+      setText('metricMarginMean', `${fmt(m.margin_mean)}%`);
+      setText('metricProfitTotal', `R$ ${fmt(m.profit_total)}`);
+      setText('metricMissingCost', m.missing_cost || 0);
+    }
+
+    function renderChart(topProfit) {
+      const labels = (topProfit || []).map(r => (r.SKU_STR || r.ITEM_ID || '').substring(0, 15));
+      const values = (topProfit || []).map(r => r.PROFIT || 0);
+      const ctx = document.getElementById('profitChart');
+      if (!ctx) return;
+      if (chart) chart.destroy();
+      chart = new Chart(ctx.getContext('2d'), {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Lucro (R$)', data: values, backgroundColor: '#1e40af' }] },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: v => 'R$ ' + v } } } }
+      });
+    }
+
+    function renderItemsTable(items) {
+      const tbody = document.querySelector('#items-table tbody');
+      if (!tbody) return;
+      tbody.innerHTML = (items || []).map(it => `
+        <tr>
+          <td>${it.sku || '-'}</td>
+          <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;">${(it.title || '-').substring(0, 40)}</td>
+          <td>R$ ${fmt(it.price)}</td>
+          <td><input type="text" class="cost-input" data-item="${it.id}" data-field="custo_produto" value="${fmt(it.custo_produto)}" placeholder="0"></td>
+          <td><input type="text" class="cost-input" data-item="${it.id}" data-field="embalagem" value="${fmt(it.embalagem)}"></td>
+          <td><input type="text" class="cost-input" data-item="${it.id}" data-field="frete" value="${fmt(it.frete)}"></td>
+          <td><input type="text" class="cost-input" data-item="${it.id}" data-field="taxa_pct" value="${fmt(it.taxa_pct)}"></td>
+          <td><input type="text" class="cost-input" data-item="${it.id}" data-field="imposto_pct" value="${fmt(it.imposto_pct)}"></td>
+          <td>${it.profit != null ? 'R$ ' + fmt(it.profit) : '-'}</td>
+          <td>${it.margin_pct != null ? fmt(it.margin_pct) + '%' : '-'}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadFromML() {
+      const err = document.getElementById('financeError');
+      err.style.display = 'none';
+      try {
+        const res = await authFetch(`${API_URL}/api/financial-panel`);
+        if (res.status === 403) {
+          document.getElementById('ml-not-connected').style.display = 'block';
+          document.getElementById('ml-loaded').style.display = 'none';
+          return;
+        }
+        if (!res.ok) throw new Error((await res.json()).detail || 'Erro');
+        const data = await res.json();
+        currentPanelData = data;
+        document.getElementById('ml-not-connected').style.display = 'none';
+        document.getElementById('ml-loaded').style.display = 'block';
+        document.getElementById('last-update').textContent = 'Atualizado agora';
+        renderMetrics(data.metrics);
+        renderChart(data.top_profit);
+        renderItemsTable(data.items);
+        document.getElementById('metricsSection').style.display = 'block';
+        document.getElementById('items-table-wrap').style.display = 'block';
+        document.getElementById('btn-save-costs').style.display = 'inline-block';
+        document.getElementById('profit-table-simple').style.display = 'none';
+        document.getElementById('profit-table-simple').style.display = 'none';
+      } catch (e) {
+        err.textContent = e.message || 'Erro ao carregar.';
+        err.style.display = 'block';
+      }
+    }
+
+    document.getElementById('btn-refresh-ml')?.addEventListener('click', loadFromML);
+    document.getElementById('btn-save-costs')?.addEventListener('click', async () => {
+      const inputs = document.querySelectorAll('#items-table input[data-item][data-field]');
+      const byItem = {};
+      inputs.forEach(inp => {
+        const id = inp.dataset.item;
+        const field = inp.dataset.field;
+        const val = parseNum(inp.value);
+        if (!byItem[id]) byItem[id] = { item_id: id };
+        if (val !== null) byItem[id][field === 'custo_produto' ? 'custo_produto' : field] = val;
+      });
+      const items = Object.values(byItem).filter(x => Object.keys(x).length > 1);
+      if (items.length === 0) { alert('Nenhuma alteração para salvar.'); return; }
+      try {
+        const res = await authFetch(`${API_URL}/api/financial-panel/costs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items })
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Erro');
+        alert('Custos salvos!');
+        loadFromML();
+      } catch (e) {
+        document.getElementById('financeError').textContent = e.message;
+        document.getElementById('financeError').style.display = 'block';
+      }
+    });
+
+    document.getElementById('btn-ai-insights')?.addEventListener('click', async () => {
+      const box = document.getElementById('ai-insights-box');
+      const content = document.getElementById('ai-insights-content');
+      content.innerHTML = '<p>Gerando insights...</p>';
+      box.style.display = 'block';
+      try {
+        const res = await authFetch(`${API_URL}/api/financial-panel/ai-insights`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Erro');
+        let html = '';
+        if (data.resumo) html += `<p><strong>Resumo:</strong> ${data.resumo}</p>`;
+        if (data.alertas?.length) html += `<p><strong>Alertas:</strong><ul>${data.alertas.map(a => '<li>' + a + '</li>').join('')}</ul></p>`;
+        if (data.sugestoes?.length) html += `<p><strong>Sugestões:</strong><ul>${data.sugestoes.map(s => '<li>' + s + '</li>').join('')}</ul></p>`;
+        if (data.top_oportunidades?.length) html += `<p><strong>Oportunidades:</strong><ul>${data.top_oportunidades.map(o => '<li>' + o + '</li>').join('')}</ul></p>`;
+        content.innerHTML = html || '<p>Nenhum insight disponível.</p>';
+      } catch (e) {
+        content.innerHTML = '<p style="color:red;">' + (e.message || 'Erro ao gerar insights.') + '</p>';
+      }
+    });
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        document.getElementById('tab-' + tab).style.display = 'block';
+        if (tab === 'ml') loadFromML();
+      });
+    });
+
+    document.getElementById('financeForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const err = document.getElementById('financeError');
       err.style.display = 'none';
-
       const mlFile = document.getElementById('mlFile').files[0];
-      if (!mlFile) {
-        err.textContent = 'Envie a planilha do Mercado Livre.';
-        err.style.display = 'block';
-        return;
-      }
-
+      if (!mlFile) { err.textContent = 'Envie a planilha.'; err.style.display = 'block'; return; }
       const form = new FormData();
       form.append('file', mlFile);
-
       const costFile = document.getElementById('costFile').files[0];
       if (costFile) form.append('costs_file', costFile);
-
-      form.append('embalagem', parseNum(document.getElementById('embalagem').value));
-      form.append('frete', parseNum(document.getElementById('frete').value));
-
+      form.append('embalagem', parseNum(document.getElementById('embalagem').value) ?? 1);
+      form.append('frete', parseNum(document.getElementById('frete').value) ?? 0);
       try {
-        const res = await authFetch(`${API_URL}/api/financial-dashboard`, {
-          method: 'POST',
-          body: form
-        });
+        const res = await authFetch(`${API_URL}/api/financial-dashboard`, { method: 'POST', body: form });
         const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.detail || 'Erro ao gerar painel.');
-        }
-
+        if (!res.ok) throw new Error(data.detail || 'Erro');
         const m = data.metrics;
-        setText('metricTotal', m.total_listings);
-        setText('metricActive', m.active_listings);
-        setText('metricStock', m.total_stock);
-        setText('metricPrice', `R$ ${m.avg_price.toFixed(2).replace('.', ',')}`);
-        setText('metricFee', `${m.avg_fee_pct.toFixed(2)}%`);
-        setText('metricProfitMean', `R$ ${m.profit_mean.toFixed(2).replace('.', ',')}`);
-        setText('metricMarginMean', `${m.margin_mean.toFixed(2)}%`);
-        setText('metricProfitTotal', `R$ ${m.profit_total.toFixed(2).replace('.', ',')}`);
-        setText('metricMissingCost', m.missing_cost);
-
-        const tbody = document.querySelector('#profitTable tbody');
-        tbody.innerHTML = '';
-        (data.top_profit || []).forEach(row => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${row.SKU_STR || '-'}</td>
-            <td>${row.TITLE || '-'}</td>
-            <td>R$ ${(row.PRICE_NUM || 0).toFixed(2).replace('.', ',')}</td>
-            <td>R$ ${(row.PROFIT || 0).toFixed(2).replace('.', ',')}</td>
-            <td>${(row.MARGIN_PCT || 0).toFixed(2)}%</td>
-          `;
-          tbody.appendChild(tr);
-        });
-
-        const labels = (data.top_profit || []).map(r => r.SKU_STR || r.ITEM_ID);
-        const values = (data.top_profit || []).map(r => r.PROFIT || 0);
-
-        const ctx = document.getElementById('profitChart').getContext('2d');
-        if (chart) chart.destroy();
-        chart = new Chart(ctx, {
-          type: 'bar',
-          data: {
-            labels,
-            datasets: [{
-              label: 'Lucro (R$)',
-              data: values,
-              backgroundColor: '#1e40af'
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: { display: false }
-            },
-            scales: {
-              y: {
-                ticks: {
-                  callback: (value) => `R$ ${value}`
-                }
-              }
-            }
-          }
-        });
-
+        renderMetrics({ total_listings: m.total_listings, active_listings: m.active_listings, total_stock: m.total_stock, avg_price: m.avg_price, avg_fee_pct: m.avg_fee_pct, profit_mean: m.profit_mean, margin_mean: m.margin_mean, profit_total: m.profit_total, missing_cost: m.missing_cost });
+        renderChart(data.top_profit);
         document.getElementById('metricsSection').style.display = 'block';
+        document.getElementById('items-table-wrap').style.display = 'none';
+        document.getElementById('btn-save-costs').style.display = 'none';
+        document.getElementById('profit-table-simple').style.display = 'block';
+        const tbody = document.querySelector('#profitTable tbody');
+        tbody.innerHTML = (data.top_profit || []).map(r => `
+          <tr><td>${r.SKU_STR || '-'}</td><td>${(r.TITLE || '-').substring(0, 40)}</td><td>R$ ${fmt(r.PRICE_NUM)}</td><td>R$ ${fmt(r.PROFIT)}</td><td>${fmt(r.MARGIN_PCT)}%</td></tr>
+        `).join('');
       } catch (error) {
         err.textContent = error.message || 'Falha ao gerar painel.';
         err.style.display = 'block';
       }
     });
-    initClerkAuth({ signInContainerId: 'clerk-signin', userButtonContainerId: 'clerk-user-button', appContentId: 'app-content' });
+
+    async function init() {
+      await initClerkAuth({ signInContainerId: 'clerk-signin', userButtonContainerId: 'clerk-user-button', appContentId: 'app-content' });
+      if (!window.ClerkAuth?.signedIn) return;
+      const mlRes = await authFetch(`${API_URL}/api/ml-status`);
+      const ml = await mlRes.json();
+      if (ml.connected) loadFromML();
+      else document.getElementById('ml-not-connected').style.display = 'block';
+    }
+    init();
   </script>
 </body>
 </html>

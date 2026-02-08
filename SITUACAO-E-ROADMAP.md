@@ -106,6 +106,20 @@ O `MlToken` é salvo corretamente no OAuth callback. Não há evidência de perd
 6. ~~Implementar busca na API ML~~ ✅
 7. ~~Página Concorrentes com listagem e comparação~~ ✅
 
+### 403 Concorrentes (busca ML)
+
+- **Causa:** API de busca do ML retorna 403 — app pode precisar de certificação.
+- **O que fizemos:** Scope OAuth `offline_access read`; mensagem amigável na tela; sugestão de reconectar conta.
+- **Ação:** Usuário pode reconectar no dashboard. Para resolver de vez, solicitar certificação do app no painel ML Developers.
+
+### Painel Financeiro — transformado ✅
+
+- Dados do Mercado Livre via API (sem planilha)
+- Custos por anúncio salvos no banco (embalagem, frete, imposto, custo)
+- Edição inline e botão Salvar
+- Insights de IA (resumo, alertas, sugestões)
+- Modo planilha mantido como fallback
+
 ### Fase 4 — Admin e banco
 
 8. Tabela `audit_log` para eventos importantes

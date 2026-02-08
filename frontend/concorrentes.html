@@ -201,6 +201,18 @@
           document.getElementById('concorrentes-container').style.display = 'none';
           return;
         }
+        if (res.status === 403) {
+          document.getElementById('results-list').innerHTML = `
+            <div class="card" style="padding: 1.5rem;">
+              <p><strong>A busca do Mercado Livre retornou 403.</strong></p>
+              <p>O app pode precisar de certificação no ML. Como alternativa:</p>
+              <ul style="margin: 1rem 0;">
+                <li><a href="dashboard.html">Reconecte sua conta</a> no dashboard</li>
+              </ul>
+            </div>`;
+          btn.disabled = false;
+          return;
+        }
         if (!res.ok) throw new Error('Erro na busca');
         const data = await res.json();
         const results = data.results || [];

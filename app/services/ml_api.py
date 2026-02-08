@@ -17,11 +17,13 @@ def get_auth_url() -> Optional[str]:
     """Retorna URL para iniciar OAuth do Mercado Livre."""
     if not ML_APP_ID or not ML_REDIRECT_URI:
         return None
+    # scope read+offline_access pode ajudar em endpoints como search
     return (
         f"https://auth.mercadolivre.com.br/authorization"
         f"?response_type=code"
         f"&client_id={ML_APP_ID}"
         f"&redirect_uri={ML_REDIRECT_URI}"
+        f"&scope=offline_access%20read"
     )
 
 
