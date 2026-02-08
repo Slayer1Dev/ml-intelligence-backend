@@ -81,10 +81,29 @@ def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token sem identificador de usuário",
         )
-    email = claims.get("email")
-    if not email and isinstance(claims.get("email_addresses"), list) and claims["email_addresses"]:
-        email = claims["email_addresses"][0].get("email_address") if isinstance(claims["email_addresses"][0], dict) else None
+    email = _extract_email_from_claims(claims)
     return get_or_create_user(clerk_user_id, email)
+
+
+def _extract_email_from_claims(claims: dict) -> str | None:
+    """Extrai email dos claims do JWT em vários formatos possíveis."""
+    raw = claims.get("email")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    if isinstance(raw, dict):
+        s = raw.get("email_address") or raw.get("email")
+        if isinstance(s, str) and s.strip():
+            return s.strip()
+    if isinstance(claims.get("email_addresses"), list) and claims["email_addresses"]:
+        first = claims["email_addresses"][0]
+        if isinstance(first, dict):
+            s = first.get("email_address") or first.get("email")
+            if isinstance(s, str) and s.strip():
+                return s.strip()
+    raw = claims.get("primary_email") or claims.get("primaryEmail")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return None
 
 
 def is_admin(email: str | None) -> bool:
