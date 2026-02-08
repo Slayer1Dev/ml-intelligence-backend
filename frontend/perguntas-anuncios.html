@@ -56,8 +56,11 @@
       <p class="subtitle">Perguntas feitas por compradores nos seus anúncios do Mercado Livre. Aprove ou edite a resposta sugerida pela IA e publique.</p>
 
       <div id="ml-not-connected" class="card" style="display: none;">
-        <p><strong>Conecte sua conta do Mercado Livre</strong> no dashboard para receber e responder perguntas dos seus anúncios.</p>
-        <a href="dashboard.html" class="button" style="margin-top: 1rem;">Ir ao dashboard</a>
+        <p><strong>Conecte sua conta do Mercado Livre</strong> para receber e responder perguntas dos seus anúncios.</p>
+        <div style="margin-top: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <button type="button" id="btn-conectar-ml-page" class="button" style="cursor: pointer; border: none;">Conectar Mercado Livre</button>
+          <a href="dashboard.html" class="button" style="text-decoration: none;">Ir ao dashboard</a>
+        </div>
       </div>
 
       <div id="upgrade-required" class="card" style="display: none;">
@@ -272,9 +275,27 @@
       btn.disabled = false;
     }
 
+    function setupConectarMlButton() {
+      var btn = document.getElementById('btn-conectar-ml-page');
+      if (!btn) return;
+      btn.onclick = async function() {
+        btn.disabled = true;
+        btn.textContent = 'Redirecionando…';
+        try {
+          var u = await authFetch(API_BASE + '/api/ml-auth-url');
+          var d = await u.json();
+          if (u.ok && d.url) window.location.href = d.url;
+          else alert(d.detail || 'Erro ao obter URL.');
+        } catch (e) { alert('Erro: ' + (e.message || 'Não foi possível conectar.')); }
+        btn.disabled = false;
+        btn.textContent = 'Conectar Mercado Livre';
+      };
+    }
+
     async function init() {
       await initClerkAuth({ signInContainerId: 'clerk-signin', userButtonContainerId: 'clerk-user-button', appContentId: 'app-content' });
       if (!window.ClerkAuth?.signedIn) return;
+      setupConectarMlButton();
       if (await checkAccess()) {
         var meRes = await authFetch(API_BASE + '/api/me');
         var me = await meRes.json();

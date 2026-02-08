@@ -79,7 +79,11 @@
       <!-- Modo ML -->
       <div id="tab-ml" class="tab-content">
         <div id="ml-not-connected" class="card" style="display: none;">
-          <p>Conecte sua conta do Mercado Livre no <a href="dashboard.html">dashboard</a> para carregar os dados automaticamente.</p>
+          <p>Conecte sua conta do Mercado Livre para carregar os dados automaticamente.</p>
+          <div style="margin-top: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <button type="button" id="btn-conectar-ml-page" class="button" style="cursor: pointer; border: none;">Conectar Mercado Livre</button>
+            <a href="dashboard.html" class="button" style="text-decoration: none;">Ir para Dashboard</a>
+          </div>
         </div>
         <div id="ml-loaded" style="display: none;">
           <div class="card" style="margin-bottom: 1rem;">
@@ -461,11 +465,29 @@
       }
     });
 
+    function setupConectarMlButton() {
+      const btn = document.getElementById('btn-conectar-ml-page');
+      if (!btn) return;
+      btn.onclick = async () => {
+        btn.disabled = true;
+        btn.textContent = 'Redirecionando…';
+        try {
+          const u = await authFetch(API_URL + '/api/ml-auth-url');
+          const d = await u.json();
+          if (u.ok && d.url) window.location.href = d.url;
+          else alert(d.detail || 'Erro ao obter URL.');
+        } catch (e) { alert('Erro: ' + (e.message || 'Não foi possível conectar.')); }
+        btn.disabled = false;
+        btn.textContent = 'Conectar Mercado Livre';
+      };
+    }
+
     async function init() {
       await initClerkAuth({ signInContainerId: 'clerk-signin', userButtonContainerId: 'clerk-user-button', appContentId: 'app-content' });
       if (!window.ClerkAuth?.signedIn) return;
+      setupConectarMlButton();
       const mlRes = await authFetch(`${API_URL}/api/ml-status`);
-      const ml = await mlRes.json();
+      const ml = await mlRes.json().catch(() => ({}));
       if (ml.connected) loadFromML();
       else document.getElementById('ml-not-connected').style.display = 'block';
     }

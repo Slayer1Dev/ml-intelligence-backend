@@ -86,8 +86,8 @@
       </div>
 
       <div id="ml-cta" class="card" style="margin-top: 1rem; padding: 2rem; text-align: center;">
-        <p id="ml-cta-text" style="color: var(--gray); margin-bottom: 0.5rem;">Conecte sua conta do Mercado Livre para acessar todas as funcoes.</p>
-        <button id="btn-conectar-ml" class="btn" style="margin-top: 0.5rem; display: none;">Conectar Mercado Livre</button>
+        <p id="ml-cta-text" style="color: var(--gray); margin-bottom: 0.75rem;">Conecte sua conta do Mercado Livre para acessar todas as funções.</p>
+        <button id="btn-conectar-ml" class="btn" type="button" style="margin-top: 0.25rem;">Conectar Mercado Livre</button>
         <p id="ml-conectado" style="font-size: 0.9rem; color: var(--success, #0a0); display: none;">✓ Conta conectada</p>
       </div>
     </main>
@@ -170,7 +170,7 @@
         applyUserState(me);
 
         const mlRes = await authFetch(API_BASE + '/api/ml-status');
-        const ml = await mlRes.json();
+        const ml = await mlRes.json().catch(() => ({}));
         const btn = document.getElementById('btn-conectar-ml');
         const conectado = document.getElementById('ml-conectado');
         const ctaText = document.getElementById('ml-cta-text');
@@ -178,7 +178,7 @@
           if (btn) btn.style.display = 'none';
           if (conectado) conectado.style.display = 'block';
           if (ctaText) ctaText.textContent = 'Sua conta do Mercado Livre está conectada.';
-        } else if (mlRes.ok) {
+        } else {
           if (btn) {
             btn.style.display = 'inline-block';
             btn.onclick = async () => {

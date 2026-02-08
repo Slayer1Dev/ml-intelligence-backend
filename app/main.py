@@ -564,13 +564,9 @@ def get_valid_ml_token(user: User) -> Optional[MlToken]:
 
 @app.get("/api/ml-status")
 def ml_status(user: User = Depends(get_current_user)):
-    """Retorna se o usuário tem conta ML conectada."""
-    db = SessionLocal()
-    try:
-        token = db.query(MlToken).filter(MlToken.user_id == user.id).first()
-        return {"connected": token is not None, "seller_id": token.seller_id if token else None}
-    finally:
-        db.close()
+    """Retorna se o usuário tem conta ML conectada. Tenta renovar o token automaticamente se expirado."""
+    token = get_valid_ml_token(user)
+    return {"connected": token is not None, "seller_id": token.seller_id if token else None}
 
 
 @app.get("/api/ml/items")

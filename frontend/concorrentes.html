@@ -64,7 +64,10 @@
         <div class="coming-soon">
           <h2>Conecte sua conta do Mercado Livre</h2>
           <p>Para comparar seus anúncios com concorrentes, conecte sua conta primeiro. A busca por termo está disponível abaixo.</p>
-          <a href="dashboard.html" class="button" style="margin-top: 1rem;">Ir para Dashboard</a>
+          <div style="margin-top: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <button type="button" id="btn-conectar-ml-page" class="button" style="cursor: pointer; border: none;">Conectar Mercado Livre</button>
+            <a href="dashboard.html" class="button" style="text-decoration: none;">Ir para Dashboard</a>
+          </div>
         </div>
       </div>
 
@@ -191,6 +194,23 @@
         loadAdminDiagnostic();
         return false;
       }
+    }
+
+    function setupConectarMlButton() {
+      const btn = document.getElementById('btn-conectar-ml-page');
+      if (!btn) return;
+      btn.onclick = async () => {
+        btn.disabled = true;
+        btn.textContent = 'Redirecionando…';
+        try {
+          const u = await authFetch(API_BASE + '/api/ml-auth-url');
+          const d = await u.json();
+          if (u.ok && d.url) window.location.href = d.url;
+          else alert(d.detail || 'Erro ao obter URL.');
+        } catch (e) { alert('Erro: ' + (e.message || 'Não foi possível conectar.')); }
+        btn.disabled = false;
+        btn.textContent = 'Conectar Mercado Livre';
+      };
     }
 
     async function loadAdminDiagnostic() {
@@ -480,7 +500,7 @@
     async function init() {
       await initClerkAuth({ signInContainerId: 'clerk-signin', userButtonContainerId: 'clerk-user-button', appContentId: 'app-content' });
       if (!window.ClerkAuth?.signedIn) return;
-
+      setupConectarMlButton();
       const ok = await checkAccess();
       if (!ok) return;
 
