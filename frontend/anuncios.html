@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="favicon.png">
   <title>Meus Anuncios — ML Intelligence</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -59,8 +60,9 @@
         <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center;">
           <label for="status-filter">Filtrar por status:</label>
           <select id="status-filter" style="padding: 0.5rem; border: 1px solid var(--gray-light); border-radius: 4px;">
+            <option value="all">Todos</option>
             <option value="active">Ativos</option>
-            <option value="paused">Pausados</option>
+            <option value="paused">Pausados / Inativo para revisar</option>
             <option value="closed">Fechados</option>
           </select>
           <span id="total-count" style="margin-left: auto; color: var(--gray);"></span>
@@ -75,7 +77,7 @@
   <script src="app-nav.js"></script>
   <script>
     const API_BASE = window.location.origin;
-    let currentStatus = 'active';
+    let currentStatus = 'all';
     let currentOffset = 0;
     const limit = 20;
 
@@ -111,8 +113,9 @@
         'paused': 'Pausado',
         'closed': 'Fechado',
         'payment_required': 'Pagamento Pendente',
+        'under_review': 'Inativo para revisar',
       };
-      return statusMap[status] || status;
+      return statusMap[status] || (status ? String(status) : 'unknown');
     }
 
     function renderItem(item) {
@@ -240,6 +243,14 @@
         currentOffset = 0;
         loadAnuncios(currentStatus, currentOffset);
       });
+
+      // Ler status da URL (ex: ?status=paused)
+      const params = new URLSearchParams(window.location.search);
+      const urlStatus = params.get('status');
+      if (urlStatus && ['all', 'active', 'paused', 'closed'].includes(urlStatus)) {
+        currentStatus = urlStatus;
+        document.getElementById('status-filter').value = urlStatus;
+      }
 
       loadAnuncios(currentStatus, currentOffset);
     }

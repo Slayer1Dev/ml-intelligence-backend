@@ -70,10 +70,22 @@ def get_user_items(access_token: str, user_id: str, status: str = "active", limi
     Args:
         access_token: Token de acesso
         user_id: ID do usuário (seller_id)
-        status: Status dos anúncios (active, paused, closed, etc)
+        status: Status dos anúncios (active, paused, closed). Use "all" para buscar todos.
         limit: Quantidade de resultados por página (máx 50)
         offset: Offset para paginação
     """
+    if status == "all":
+        # Busca active + paused + closed e mescla (inclui "inativo para revisar" em paused)
+        all_results: List[str] = []
+        all_paging = {"total": 0, "offset": 0, "limit": limit}
+        for st in ["active", "paused", "closed"]:
+            r = get_user_items(access_token, user_id, status=st, limit=50, offset=0)
+            if r and r.get("results"):
+                all_results.extend(r["results"])
+                p = r.get("paging", {})
+                all_paging["total"] = all_paging.get("total", 0) + p.get("total", 0)
+        return {"results": all_results, "paging": {"total": len(all_results), "offset": 0, "limit": limit}}
+    
     headers = {"Authorization": f"Bearer {access_token}"}
     params = {
         "status": status,

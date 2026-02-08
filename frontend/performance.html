@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="favicon.png">
   <title>Performance — ML Intelligence</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -67,22 +68,25 @@
       </div>
 
       <div id="metrics-container" style="display: none;">
-        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-          <div class="card" style="text-align: center;">
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+          <a href="anuncios.html?status=active" class="card card-link" style="text-align: center; text-decoration: none; color: inherit;">
             <div style="font-size: 2rem; margin-bottom: 0.5rem;">📦</div>
             <div style="font-size: 2rem; font-weight: bold; color: var(--primary);" id="metric-active">-</div>
             <div style="color: var(--gray); font-size: 0.9rem;">Anúncios Ativos</div>
-          </div>
-          <div class="card" style="text-align: center;">
+            <div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--primary);">Ver lista →</div>
+          </a>
+          <a href="anuncios.html?status=paused" class="card card-link" style="text-align: center; text-decoration: none; color: inherit;">
             <div style="font-size: 2rem; margin-bottom: 0.5rem;">⏸️</div>
             <div style="font-size: 2rem; font-weight: bold; color: var(--warning);" id="metric-paused">-</div>
-            <div style="color: var(--gray); font-size: 0.9rem;">Anúncios Pausados</div>
-          </div>
-          <div class="card" style="text-align: center;">
+            <div style="color: var(--gray); font-size: 0.9rem;">Pausados / Inativo p/ revisar</div>
+            <div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--primary);">Ver lista →</div>
+          </a>
+          <a href="anuncios.html?status=closed" class="card card-link" style="text-align: center; text-decoration: none; color: inherit;">
             <div style="font-size: 2rem; margin-bottom: 0.5rem;">✅</div>
             <div style="font-size: 2rem; font-weight: bold; color: var(--success);" id="metric-closed">-</div>
             <div style="color: var(--gray); font-size: 0.9rem;">Anúncios Fechados</div>
-          </div>
+            <div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--primary);">Ver lista →</div>
+          </a>
           <div class="card" style="text-align: center;">
             <div style="font-size: 2rem; margin-bottom: 0.5rem;">💰</div>
             <div style="font-size: 2rem; font-weight: bold; color: var(--primary);" id="metric-orders">-</div>
@@ -91,8 +95,11 @@
         </div>
 
         <div class="card">
-          <h2 style="margin-top: 0;">Resumo</h2>
+          <h2 style="margin-top: 0;">Resumo da Conta</h2>
           <div id="summary-content"></div>
+          <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--gray-light);">
+            <a href="anuncios.html" class="button">Ver todos os anúncios</a>
+          </div>
         </div>
       </div>
     </main>
@@ -160,11 +167,11 @@
 
         const summaryEl = document.getElementById('summary-content');
         summaryEl.innerHTML = `
-          <div style="line-height: 1.8;">
+          <div style="line-height: 2;">
             <p><strong>Total de Anúncios:</strong> ${items.total || 0}</p>
-            <p><strong>Anúncios Ativos:</strong> ${items.active || 0}</p>
-            <p><strong>Anúncios Pausados:</strong> ${items.paused || 0}</p>
-            <p><strong>Anúncios Fechados:</strong> ${items.closed || 0}</p>
+            <p><strong>Anúncios Ativos:</strong> ${items.active || 0} <span style="color: var(--gray); font-size: 0.9rem;">— visíveis na vitrine</span></p>
+            <p><strong>Pausados / Inativo para revisar:</strong> ${items.paused || 0} <span style="color: var(--gray); font-size: 0.9rem;">— exigem ação</span></p>
+            <p><strong>Fechados:</strong> ${items.closed || 0}</p>
             <p><strong>Pedidos Pagos:</strong> ${orders.paid || 0}</p>
           </div>
         `;

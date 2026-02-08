@@ -51,8 +51,8 @@ O `MlToken` é salvo corretamente no OAuth callback. Não há evidência de perd
 |------|--------|------------|
 | Login (Clerk) | ✅ | Funcional |
 | OAuth Mercado Livre | ✅ | Tokens salvos em `ml_tokens` |
-| Meus Anúncios | ⚠️ | Lista itens, mas dados vazios (bug da API) |
-| Performance | ⚠️ | Mostra contadores, mas layout básico |
+| Meus Anúncios | ✅ | Lista todos os status (ativo, pausado, fechado, inativo p/ revisar) |
+| Performance | ✅ | Cards clicáveis, links para anúncios, resumo melhorado |
 | Concorrentes | ❌ | Apenas "Em breve" |
 | Admin — Usuários | ✅ | Lista usuários |
 | Admin — Assinaturas | ✅ | Lista assinaturas |
@@ -64,12 +64,13 @@ O `MlToken` é salvo corretamente no OAuth callback. Não há evidência de perd
 
 ## 3. O que falta (alinhado ao ROADMAP.md)
 
-### Curto prazo (correções)
+### Curto prazo (correções) — concluído
 
-1. **Corrigir estrutura da resposta** de `/api/ml/items` (extrair `body`)
-2. **Tratar erros 403** de forma distinta (ML não conectado vs plano necessário)
-3. **Melhorar sincronização** no frontend (Clerk pronto antes de checar ML)
-4. **Melhorar Performance** — layout, cards mais informativos, link para anúncios
+1. ~~Corrigir estrutura da resposta de `/api/ml/items`~~ ✅
+2. ~~Tratar erros 403 de forma distinta~~ ✅
+3. ~~Melhorar sincronização no frontend~~ ✅
+4. ~~Melhorar Performance — layout, cards, links~~ ✅
+5. ~~Filtro "Todos" em Meus Anúncios — inclui pausados/inativo para revisar~~ ✅
 
 ### Médio prazo (funcionalidades)
 
