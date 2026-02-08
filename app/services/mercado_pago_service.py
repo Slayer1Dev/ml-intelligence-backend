@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 from app.models import Subscription, User
 
 MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN")
-MP_PLAN_VALUE = float(os.getenv("MP_PLAN_VALUE", "29.90"))
+_raw_value = (os.getenv("MP_PLAN_VALUE") or "29.90").strip().replace(",", ".")
+MP_PLAN_VALUE = float(_raw_value) if _raw_value else 29.90
 MP_PLAN_REASON = os.getenv("MP_PLAN_REASON", "ML Intelligence - Plano Pro Mensal")
 
 MP_API = "https://api.mercadopago.com"
