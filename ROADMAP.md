@@ -155,14 +155,17 @@ Para guardar usuários, plano e assinaturas:
 
 ## 6. Próxima ação concreta
 
-Sugestão de primeiro passo:
+### Já feito (Fase A — parte 1)
+- [x] Clerk no frontend (SignIn/UserButton)
+- [x] Proteção de rotas no backend (JWT)
+- [x] Páginas protegidas (dashboard, calculadora, financeiro, etc.)
+- [x] `.env` no `.gitignore`, revisão de segurança, CORS configurável
 
-1. Criar estrutura de pastas e modelos para `users` e `subscriptions`
-2. Adicionar Clerk no frontend (botão de login)
-3. Proteger uma rota de exemplo no backend
-4. Criar a rota `/admin` (protegida só para você) com uma página simples
-
-Depois disso, vem Stripe e a lógica free/paid.
+### Próximo passo (após testar no Railway)
+1. **Banco de dados** — estrutura `users` + `subscriptions` (SQLite local, PostgreSQL na Railway)
+2. **Stripe** — produto, checkout, webhook
+3. **Lógica free vs paid** — free só vê calculadora
+4. **Admin** — área `/admin` protegida
 
 ---
 

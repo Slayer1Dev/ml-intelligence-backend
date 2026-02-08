@@ -68,6 +68,13 @@
   color: var(--gray);
 }
 
+/* Clerk UserButton no header */
+#clerk-user-button {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.5rem;
+}
+
 /* ===================== BODY ===================== */
 .app-body {
   display: flex;

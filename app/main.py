@@ -1,9 +1,13 @@
 # app/main.py
-from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException, Form
+import os
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import PlainTextResponse, JSONResponse, RedirectResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
+
+from app.auth import clerk_auth_guard, get_clerk_config
 
 import logging
 import uuid
@@ -32,13 +36,17 @@ if not any(isinstance(h, logging.FileHandler) and getattr(h, "baseFilename", "")
     logger.addHandler(fh)
 
 # ------------------------------------------------------------------
-# App & CORS
+# App & CORS (auth já carrega dotenv)
 # ------------------------------------------------------------------
+# Em produção: defina ALLOWED_ORIGINS no Railway (ex: https://seu-app.railway.app)
+_CORS_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
+_CORS_LIST = [o.strip() for o in _CORS_ORIGINS.split(",") if o.strip()] if _CORS_ORIGINS != "*" else ["*"]
+
 app = FastAPI(title="ML Intelligence Backend")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ajuste em produção
+    allow_origins=_CORS_LIST,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -196,8 +204,17 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/api/clerk-config")
+def clerk_config():
+    """Retorna publishableKey e frontendApi para o frontend inicializar o Clerk."""
+    return get_clerk_config()
+
+
 @app.post("/api/calculate-profit")
-def calculate_profit_endpoint(data: ProfitInput):
+def calculate_profit_endpoint(
+    data: ProfitInput,
+    _auth=Depends(clerk_auth_guard),
+):
     """Calcula lucro e margem a partir de custo, preço e despesas."""
     taxa = data.preco_venda * (data.taxa_percentual / 100)
     imposto = data.preco_venda * (data.imposto_percentual / 100)
@@ -216,6 +233,7 @@ async def financial_dashboard(
     costs_file: Optional[UploadFile] = File(None),
     embalagem: float = Form(1.0),
     frete: float = Form(0.0),
+    _auth=Depends(clerk_auth_guard),
 ):
     """Gera indicadores financeiros a partir da planilha do ML e custos opcionais."""
     if not file or not file.filename:
@@ -313,7 +331,11 @@ def market_analysis_ai():
 
 
 @app.post("/upload-planilha")
-async def upload_planilha(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def upload_planilha(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    _auth=Depends(clerk_auth_guard),
+):
     """Recebe arquivo, grava temporário e dispara processamento em background (retorna job_id)."""
     if not file or not file.filename:
         raise HTTPException(status_code=400, detail="Arquivo inválido")
@@ -343,13 +365,13 @@ async def upload_planilha(background_tasks: BackgroundTasks, file: UploadFile = 
 
 
 @app.get("/jobs")
-def list_jobs():
+def list_jobs(_auth=Depends(clerk_auth_guard)):
     """Retorna todos os jobs (id -> status)."""
     return JOB_STORE
 
 
 @app.get("/jobs/{job_id}")
-def get_job(job_id: str):
+def get_job(job_id: str, _auth=Depends(clerk_auth_guard)):
     job = JOB_STORE.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="job não encontrado")

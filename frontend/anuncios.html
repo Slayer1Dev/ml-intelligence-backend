@@ -13,9 +13,12 @@
   <header class="app-header">
     <a href="dashboard.html" class="app-logo">ML Intelligence</a>
     <span class="app-user">Ola, vendedor</span>
+    <div id="clerk-user-button"></div>
   </header>
 
-  <div class="app-body">
+  <div id="clerk-signin" style="display:none; padding: 2rem; max-width: 400px; margin: 4rem auto;"></div>
+
+  <div id="app-content" class="app-body">
     <aside class="app-sidebar">
       <nav>
         <a href="dashboard.html">Resumo</a>
@@ -44,5 +47,8 @@
       </div>
     </main>
   </div>
+
+  <script src="clerk-auth.js"></script>
+  <script>initClerkAuth({ signInContainerId: 'clerk-signin', userButtonContainerId: 'clerk-user-button', appContentId: 'app-content' });</script>
 </body>
 </html>
