@@ -5,10 +5,44 @@
 (function () {
   const API_BASE = window.location.origin;
 
+  /** Parse JSON seguro: evita erro "Unexpected token" quando backend retorna HTML/500. */
+  window.safeJson = async function (res) {
+    const text = await res.text();
+    if (!text || !text.trim()) return {};
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    if (!ct.includes('application/json') && !/^\s*[{[]/.test(text)) {
+      throw new Error('O servidor retornou uma resposta inválida. Verifique se o backend está funcionando.');
+    }
+    try {
+      return JSON.parse(text);
+    } catch (_) {
+      throw new Error('O servidor retornou uma resposta inválida. Verifique se o backend está funcionando.');
+    }
+  };
+
+  /** Envolve fetch para que res.json() lance erro amigável em respostas inválidas. */
+  function wrapAuthFetch(fn) {
+    return async function (url, opts) {
+      const res = await fn(url, opts);
+      const origJson = res.json.bind(res);
+      res.json = async function () {
+        try {
+          return await origJson();
+        } catch (e) {
+          throw new Error('O servidor retornou uma resposta inválida. Verifique se o backend está funcionando.');
+        }
+      };
+      return res;
+    };
+  }
+
   // Busca config do backend e inicializa Clerk
   async function initClerk() {
     const res = await fetch(`${API_BASE}/api/clerk-config`);
-    const config = await res.json();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/93780d09-6b5a-42a9-b230-9dd7e72f883b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'clerk-auth.js:clerk-config',message:'clerk_config_response',data:{status:res.status,ok:res.ok,contentType:res.headers.get('content-type')},hypothesisId:'H1',timestamp:Date.now()})}).catch(function(){});
+    // #endregion
+    const config = await window.safeJson(res);
     const pk = config.publishableKey?.trim();
     const frontendApi = config.frontendApi?.trim();
 
@@ -17,7 +51,7 @@
       window.ClerkAuth = {
         ready: true,
         signedIn: false,
-        authFetch: (url, opts = {}) => fetch(url, opts),
+        authFetch: wrapAuthFetch((url, opts) => fetch(url, opts)),
         getUserName: () => 'Visitante',
       };
       return;
@@ -38,12 +72,12 @@
             ready: true,
             signedIn,
             clerk: Clerk,
-            authFetch: async (url, opts = {}) => {
+            authFetch: wrapAuthFetch(async (url, opts = {}) => {
               const token = Clerk.session ? await Clerk.session.getToken() : null;
               const headers = { ...opts.headers };
               if (token) headers['Authorization'] = `Bearer ${token}`;
               return fetch(url, { ...opts, headers });
-            },
+            }),
             getUserName: () => (Clerk.user ? Clerk.user.firstName || Clerk.user.emailAddresses?.[0]?.emailAddress || 'Usuário' : ''),
           };
         resolve(window.ClerkAuth);
@@ -72,7 +106,7 @@
       console.error('Clerk init error:', err);
       if (appContent) appContent.style.display = '';
       if (signInEl) { signInEl.style.display = 'none'; signInEl.innerHTML = ''; }
-      window.ClerkAuth = { ready: true, signedIn: false, authFetch: (u, o) => fetch(u, o), getUserName: () => 'Visitante' };
+      window.ClerkAuth = { ready: true, signedIn: false, authFetch: wrapAuthFetch((u, o) => fetch(u, o)), getUserName: () => 'Visitante' };
       return;
     }
 
@@ -103,9 +137,9 @@
     return auth;
   };
 
-  // Helper global para fetch autenticado
+  // Helper global para fetch autenticado (com json() seguro)
   window.authFetch = function (url, opts) {
     if (window.ClerkAuth?.authFetch) return window.ClerkAuth.authFetch(url, opts);
-    return fetch(url, opts);
+    return wrapAuthFetch((u, o) => fetch(u, o))(url, opts);
   };
 })();

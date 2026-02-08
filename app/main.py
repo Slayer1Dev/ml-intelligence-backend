@@ -28,6 +28,18 @@ import pandas as pd
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 LOG_FILE = LOG_DIR / "backend.log"
+DEBUG_LOG = Path(__file__).resolve().parent.parent / ".cursor" / "debug.log"
+
+def _debug_log(message: str, data: dict, hypothesis_id: str = ""):
+    try:
+        DEBUG_LOG.parent.mkdir(parents=True, exist_ok=True)
+        entry = {"timestamp": time.time(), "location": "main.py", "message": message, "data": data}
+        if hypothesis_id:
+            entry["hypothesisId"] = hypothesis_id
+        with open(DEBUG_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger("ml-intelligence")
@@ -47,6 +59,14 @@ _CORS_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
 _CORS_LIST = [o.strip() for o in _CORS_ORIGINS.split(",") if o.strip()] if _CORS_ORIGINS != "*" else ["*"]
 
 app = FastAPI(title="ML Intelligence Backend")
+
+
+@app.exception_handler(Exception)
+async def _debug_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, HTTPException):
+        raise exc
+    _debug_log("backend_exception", {"path": str(request.url.path), "error": str(exc), "type": type(exc).__name__}, "H4")
+    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 
 @app.on_event("startup")
@@ -415,12 +435,18 @@ def health():
 @app.get("/api/clerk-config")
 def clerk_config():
     """Retorna publishableKey e frontendApi para o frontend inicializar o Clerk."""
+    # #region agent log
+    _debug_log("api_clerk_config_entry", {}, "H1")
+    # #endregion
     return get_clerk_config()
 
 
 @app.get("/api/me")
 def get_me(user: User = Depends(get_current_user)):
     """Retorna dados do usuário logado (plan, email, isAdmin, telegramLinked)."""
+    # #region agent log
+    _debug_log("api_me_ok", {"user_id": user.id, "email": (user.email or "")[:20], "isAdmin": is_admin(user.email)}, "H3")
+    # #endregion
     return {
         "plan": user.plan,
         "email": user.email,
@@ -480,12 +506,17 @@ def debug_admin(user: User = Depends(get_current_user)):
 @app.get("/api/ml-auth-url")
 def ml_auth_url(user: User = Depends(get_current_user)):
     """Retorna URL para redirecionar o usuário ao OAuth do Mercado Livre."""
+    # #region agent log
+    _debug_log("api_ml_auth_url_entry", {"user_id": user.id}, "H2")
+    # #endregion
     url = get_auth_url()
     if not url:
+        _debug_log("api_ml_auth_url_no_config", {}, "H2")
         raise HTTPException(
             status_code=503,
             detail="Mercado Livre não configurado. Defina ML_APP_ID, ML_SECRET e ML_REDIRECT_URI.",
         )
+    _debug_log("api_ml_auth_url_ok", {"has_url": bool(url)}, "H2")
     return {"url": url}
 
 

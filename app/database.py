@@ -2,7 +2,7 @@
 import os
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -34,11 +34,32 @@ def get_db():
         db.close()
 
 
+def _migrate_add_telegram_chat_id():
+    """Adiciona coluna telegram_chat_id em users se não existir (migração)."""
+    try:
+        with engine.connect() as conn:
+            if "sqlite" in _DB_PATH:
+                conn.execute(text("ALTER TABLE users ADD COLUMN telegram_chat_id VARCHAR(64)"))
+            else:
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(64)"))
+            conn.commit()
+    except Exception as e:
+        msg = str(e).lower()
+        if "duplicate column" in msg or "already exists" in msg:
+            pass
+        else:
+            raise
+
+
 def init_db():
     """Cria as tabelas se não existirem. Em produção use DATABASE_URL (PostgreSQL) para persistir dados."""
     import logging
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    try:
+        _migrate_add_telegram_chat_id()
+    except Exception:
+        pass
     kind = "SQLite (dados locais)" if "sqlite" in _DB_PATH else "PostgreSQL (persistente)"
     logging.getLogger("ml-intelligence").info("Banco: %s", kind)
