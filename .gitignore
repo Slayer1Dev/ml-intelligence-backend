@@ -6,6 +6,7 @@ __pycache__/
 
 # Env e credenciais (nunca commitar)
 .env
+.env.example
 .env.txt
 .env.local
 .env.*.local
