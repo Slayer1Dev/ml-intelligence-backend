@@ -74,6 +74,10 @@
           <p>Assine o plano para acessar Concorrentes.</p>
           <a href="dashboard.html" class="button" style="margin-top: 1rem;">Ver planos</a>
         </div>
+        <div id="admin-diagnostic" style="margin-top: 1.5rem; padding: 1rem; background: #f8fafc; border-radius: 8px; font-size: 0.9rem; color: var(--gray); display: none;">
+          <strong>Diagnóstico (admin):</strong>
+          <p id="admin-diagnostic-text" style="margin: 0.5rem 0 0 0; white-space: pre-wrap;"></p>
+        </div>
       </div>
 
       <div id="concorrentes-container" style="display: none;">
@@ -169,6 +173,7 @@
 
         if (!hasPlan) {
           document.getElementById('upgrade-required').style.display = 'block';
+          loadAdminDiagnostic();
           return false;
         }
         document.getElementById('concorrentes-container').style.display = 'block';
@@ -183,7 +188,27 @@
       } catch (e) {
         console.error(e);
         document.getElementById('upgrade-required').style.display = 'block';
+        loadAdminDiagnostic();
         return false;
+      }
+    }
+
+    async function loadAdminDiagnostic() {
+      const box = document.getElementById('admin-diagnostic');
+      const text = document.getElementById('admin-diagnostic-text');
+      if (!box || !text) return;
+      try {
+        const res = await authFetch(API_BASE + '/api/debug-admin');
+        const d = await res.json();
+        box.style.display = 'block';
+        text.textContent = [
+          'Email que o sistema reconhece: ' + (d.seu_email || '(vazio)'),
+          'isAdmin: ' + d.isAdmin,
+          'Dica: ' + (d.dica || '')
+        ].join('\n');
+      } catch (e) {
+        box.style.display = 'block';
+        text.textContent = 'Não foi possível carregar o diagnóstico. Faça login novamente.';
       }
     }
 

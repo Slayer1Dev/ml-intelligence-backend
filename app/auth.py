@@ -26,13 +26,13 @@ CLERK_JWKS_URL = os.getenv("CLERK_JWKS_URL")
 CLERK_PUBLISHABLE_KEY = os.getenv("CLERK_PUBLISHABLE_KEY")
 CLERK_FRONTEND_API = os.getenv("CLERK_FRONTEND_API")
 
-# Lista de e-mails admin (separados por vírgula)
-_ADMIN_EMAILS_RAW = os.getenv("ADMIN_EMAILS", "")
-ADMIN_EMAILS: List[str] = [
-    e.strip().lower()
-    for e in _ADMIN_EMAILS_RAW.split(",")
-    if e.strip()
-]
+# Lista de e-mails admin (separados por vírgula) — lida em tempo de execução para refletir env após restart
+def _get_admin_emails() -> List[str]:
+    raw = os.getenv("ADMIN_EMAILS", "")
+    return [e.strip().lower() for e in raw.split(",") if e.strip()]
+
+
+ADMIN_EMAILS: List[str] = _get_admin_emails()  # usado por debug-admin e outros que precisam da lista
 
 # Quando Clerk configurado: valida JWT. Senão: permite acesso sem token (dev).
 clerk_auth_guard = None
@@ -106,11 +106,17 @@ def _extract_email_from_claims(claims: dict) -> str | None:
     return None
 
 
+def get_admin_emails() -> List[str]:
+    """Retorna a lista atual de e-mails admin (para diagnóstico)."""
+    return _get_admin_emails()
+
+
 def is_admin(email: str | None) -> bool:
-    """Verifica se o e-mail está na lista de admins."""
+    """Verifica se o e-mail está na lista de admins (lê ADMIN_EMAILS do env a cada chamada)."""
     if not email:
         return False
-    return email.strip().lower() in ADMIN_EMAILS
+    admin_list = _get_admin_emails()
+    return email.strip().lower() in admin_list
 
 
 def admin_guard(user: "User" = Depends(get_current_user)):
