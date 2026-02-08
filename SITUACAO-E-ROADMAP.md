@@ -53,7 +53,7 @@ O `MlToken` é salvo corretamente no OAuth callback. Não há evidência de perd
 | OAuth Mercado Livre | ✅ | Tokens salvos em `ml_tokens` |
 | Meus Anúncios | ✅ | Lista todos os status (ativo, pausado, fechado, inativo p/ revisar) |
 | Performance | ✅ | Cards clicáveis, links para anúncios, resumo melhorado |
-| Concorrentes | ❌ | Apenas "Em breve" |
+| Concorrentes | ✅ | Busca por termo + comparar meu anúncio |
 | Admin — Usuários | ✅ | Lista usuários |
 | Admin — Assinaturas | ✅ | Lista assinaturas |
 | Admin — Logs | ✅ | Mostra arquivo `logs/backend.log` |
@@ -101,10 +101,10 @@ O `MlToken` é salvo corretamente no OAuth callback. Não há evidência de perd
 4. Melhorar tela de Performance (links, resumo mais rico)
 5. Revisar mensagens de erro nas páginas
 
-### Fase 3 — Concorrentes
+### Fase 3 — Concorrentes — concluído ✅
 
-6. Implementar busca na API ML (`/sites/MLB/search?q=termo`)
-7. Página Concorrentes com listagem e comparação
+6. ~~Implementar busca na API ML~~ ✅
+7. ~~Página Concorrentes com listagem e comparação~~ ✅
 
 ### Fase 4 — Admin e banco
 

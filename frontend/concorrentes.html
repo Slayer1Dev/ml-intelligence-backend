@@ -9,11 +9,25 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css">
+  <style>
+    .search-box { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .search-box input { flex: 1; min-width: 200px; padding: 0.75rem 1rem; border: 1px solid var(--gray-light); border-radius: 8px; font-size: 1rem; }
+    .search-box input:focus { outline: none; border-color: var(--primary); }
+    .compare-section { background: var(--blue-light, #eff6ff); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    .result-row { display: flex; gap: 1rem; align-items: center; padding: 1rem; border-bottom: 1px solid #eee; }
+    .result-row:last-child { border-bottom: none; }
+    .result-row.mine { background: rgba(30, 64, 175, 0.08); border-radius: 8px; margin: 0.25rem 0; }
+    .result-row .thumb { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; }
+    .result-row .pos { font-weight: 700; color: var(--primary); min-width: 2rem; }
+    .result-row .info { flex: 1; }
+    .result-row .price { font-weight: 600; color: var(--primary); }
+    .badge { font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px; background: #22c55e; color: white; }
+  </style>
 </head>
 <body class="app">
   <header class="app-header">
     <a href="dashboard.html" class="app-logo">ML Intelligence</a>
-    <span class="app-user">Ola, vendedor</span>
+    <span class="app-user">Olá, vendedor</span>
     <div id="clerk-user-button"></div>
   </header>
 
@@ -25,7 +39,7 @@
         <a href="dashboard.html">Resumo</a>
         <a href="financeiro.html">Painel Financeiro</a>
         <a href="calculator.html">Calculadora de Lucro</a>
-        <a href="anuncios.html">Meus Anuncios</a>
+        <a href="anuncios.html">Meus Anúncios</a>
         <a href="performance.html">Performance</a>
         <a href="concorrentes.html" class="active">Concorrentes</a>
         <span id="admin-link-wrap" style="display:none;"><hr style="margin: 0.5rem 0; border-color: var(--gray-light);"><a href="admin.html">⚙️ Admin</a></span>
@@ -34,17 +48,69 @@
 
     <main class="app-main">
       <h1>Concorrentes</h1>
-      <p class="subtitle">Acompanhe anuncios concorrentes e veja onde seu produto se posiciona no marketplace.</p>
-      <div class="card">
+      <p class="subtitle">Busque concorrentes no marketplace e compare seu anúncio com os líderes.</p>
+
+      <div id="ml-not-connected" class="card" style="display: none;">
         <div class="coming-soon">
-          <h2>Em breve</h2>
-          <p>Esta funcao permitira acompanhar concorrentes apos a integracao com o Mercado Livre.</p>
-          <ul class="feature-list">
-            <li>Buscar e monitorar anuncios concorrentes</li>
-            <li>Ver preco, vendas e posicao de cada um</li>
-            <li>Comparar seu anuncio com os lideres</li>
-            <li>Insights de IA sobre o mercado</li>
-          </ul>
+          <h2>Conecte sua conta do Mercado Livre</h2>
+          <p>Para comparar seus anúncios com concorrentes, conecte sua conta primeiro. A busca por termo está disponível abaixo.</p>
+          <a href="dashboard.html" class="button" style="margin-top: 1rem;">Ir para Dashboard</a>
+        </div>
+      </div>
+
+      <div id="upgrade-required" class="card" style="display: none;">
+        <div class="coming-soon">
+          <h2>Plano Pro necessário</h2>
+          <p>Assine o plano para acessar Concorrentes.</p>
+          <a href="dashboard.html" class="button" style="margin-top: 1rem;">Ver planos</a>
+        </div>
+      </div>
+
+      <div id="concorrentes-container" style="display: none;">
+        <!-- Busca por termo -->
+        <div class="card" style="margin-bottom: 1.5rem;">
+          <h2 style="margin-top: 0;">Buscar concorrentes por termo</h2>
+          <div class="search-box">
+            <input type="text" id="search-input" placeholder="Ex: fone bluetooth, notebook gamer..." autocomplete="off">
+            <select id="sort-select" style="padding: 0.75rem; border: 1px solid var(--gray-light); border-radius: 8px;">
+              <option value="">Relevância</option>
+              <option value="price_asc">Menor preço</option>
+              <option value="price_desc">Maior preço</option>
+              <option value="sales_desc">Mais vendidos</option>
+            </select>
+            <button type="button" id="btn-search" class="button">Buscar</button>
+          </div>
+        </div>
+
+        <!-- Comparar meu anúncio (se ML conectado) -->
+        <div id="compare-section" class="compare-section" style="display: none;">
+          <h3 style="margin-top: 0;">Comparar meu anúncio</h3>
+          <p style="color: var(--gray); margin-bottom: 1rem;">Selecione um dos seus anúncios para ver sua posição na busca.</p>
+          <div class="search-box">
+            <select id="my-items-select" style="flex: 1; min-width: 200px; padding: 0.75rem; border: 1px solid var(--gray-light); border-radius: 8px;">
+              <option value="">Carregando seus anúncios...</option>
+            </select>
+            <button type="button" id="btn-compare" class="button">Comparar</button>
+          </div>
+        </div>
+
+        <!-- Resultados da busca -->
+        <div id="results-area" style="display: none;">
+          <div class="card">
+            <h2 style="margin-top: 0;">Resultados da busca</h2>
+            <p id="results-meta" style="color: var(--gray); margin-bottom: 1rem;"></p>
+            <div id="results-list"></div>
+            <div id="results-pagination" style="margin-top: 1rem; text-align: center;"></div>
+          </div>
+        </div>
+
+        <!-- Resultados da comparação -->
+        <div id="compare-results-area" style="display: none;">
+          <div class="card">
+            <h2 style="margin-top: 0;">Comparação: <span id="compare-title"></span></h2>
+            <div id="compare-summary" style="margin-bottom: 1rem; padding: 1rem; background: #f8fafc; border-radius: 8px;"></div>
+            <div id="compare-list"></div>
+          </div>
         </div>
       </div>
     </main>
@@ -52,6 +118,231 @@
 
   <script src="clerk-auth.js"></script>
   <script src="app-nav.js"></script>
-  <script>initClerkAuth({ signInContainerId: 'clerk-signin', userButtonContainerId: 'clerk-user-button', appContentId: 'app-content' });</script>
+  <script>
+    const API_BASE = window.location.origin;
+    let mlConnected = false;
+    let searchOffset = 0;
+    const limit = 20;
+
+    function formatPrice(p) {
+      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p || 0);
+    }
+
+    async function checkAccess() {
+      try {
+        const [meRes, mlRes] = await Promise.all([
+          authFetch(API_BASE + '/api/me'),
+          authFetch(API_BASE + '/api/ml-status'),
+        ]);
+        const me = await meRes.json();
+        const ml = await mlRes.json();
+        const hasPlan = me.plan === 'active' || me.isAdmin;
+        mlConnected = ml.connected === true;
+
+        if (!hasPlan) {
+          document.getElementById('upgrade-required').style.display = 'block';
+          return false;
+        }
+        document.getElementById('concorrentes-container').style.display = 'block';
+        if (mlConnected) {
+          document.getElementById('compare-section').style.display = 'block';
+          loadMyItems();
+        } else {
+          document.getElementById('ml-not-connected').style.display = 'block';
+        }
+        return true;
+      } catch (e) {
+        console.error(e);
+        document.getElementById('upgrade-required').style.display = 'block';
+        return false;
+      }
+    }
+
+    async function loadMyItems() {
+      const sel = document.getElementById('my-items-select');
+      try {
+        const res = await authFetch(API_BASE + '/api/ml/items?status=all&limit=100&offset=0');
+        if (!res.ok) return;
+        const data = await res.json();
+        const items = data.items || [];
+        sel.innerHTML = '<option value="">Selecione um anúncio...</option>';
+        items.forEach(it => {
+          const opt = document.createElement('option');
+          opt.value = it.id;
+          opt.textContent = (it.title || it.id).substring(0, 60) + (it.title && it.title.length > 60 ? '...' : '');
+          sel.appendChild(opt);
+        });
+      } catch (e) {
+        sel.innerHTML = '<option value="">Erro ao carregar anúncios</option>';
+      }
+    }
+
+    async function doSearch(offset = 0) {
+      const q = document.getElementById('search-input').value.trim();
+      if (!q || q.length < 2) {
+        alert('Digite pelo menos 2 caracteres para buscar.');
+        return;
+      }
+      const sort = document.getElementById('sort-select').value || undefined;
+      const btn = document.getElementById('btn-search');
+      btn.disabled = true;
+      document.getElementById('compare-results-area').style.display = 'none';
+      document.getElementById('results-area').style.display = 'block';
+      document.getElementById('results-list').innerHTML = '<p>Buscando...</p>';
+
+      try {
+        let url = `${API_BASE}/api/ml/search?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`;
+        if (sort) url += '&sort=' + encodeURIComponent(sort);
+        const res = await authFetch(url);
+        if (res.status === 403) {
+          const err = await res.json().catch(() => ({}));
+          if (err.detail === 'ml_not_connected') document.getElementById('ml-not-connected').style.display = 'block';
+          else document.getElementById('upgrade-required').style.display = 'block';
+          document.getElementById('concorrentes-container').style.display = 'none';
+          return;
+        }
+        if (!res.ok) throw new Error('Erro na busca');
+        const data = await res.json();
+        const results = data.results || [];
+        const paging = data.paging || {};
+        const total = paging.total || 0;
+
+        document.getElementById('results-meta').textContent = `Encontrados ${total} anúncios para "${q}"`;
+
+        if (results.length === 0) {
+          document.getElementById('results-list').innerHTML = '<p style="color: var(--gray);">Nenhum resultado encontrado.</p>';
+        } else {
+          document.getElementById('results-list').innerHTML = results.map((r, i) => {
+            const pos = offset + i + 1;
+            const thumb = r.thumbnail || '';
+            const price = formatPrice(r.price);
+            const sold = r.sold_quantity || 0;
+            const link = r.permalink || `https://produto.mercadolivre.com.br/${r.id}`;
+            return `
+              <div class="result-row">
+                <span class="pos">#${pos}</span>
+                ${thumb ? `<img class="thumb" src="${thumb}" alt="">` : ''}
+                <div class="info">
+                  <a href="${link}" target="_blank" style="color: var(--primary); text-decoration: none;">${r.title || 'Sem título'}</a>
+                  <div style="margin-top: 0.25rem;">
+                    <span class="price">${price}</span>
+                    ${sold > 0 ? `<span class="badge" style="margin-left: 0.5rem;">${sold} vendidos</span>` : ''}
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+
+        const pagEl = document.getElementById('results-pagination');
+        if (total > limit) {
+          const pages = Math.ceil(total / limit);
+          const page = Math.floor(offset / limit) + 1;
+          let html = '';
+          if (page > 1) {
+            html += `<button onclick="doSearch(${offset - limit})" class="button" style="margin-right: 0.5rem;">Anterior</button>`;
+          }
+          html += `<span style="margin: 0 1rem;">Página ${page} de ${pages}</span>`;
+          if (page < pages) {
+            html += `<button onclick="doSearch(${offset + limit})" class="button" style="margin-left: 0.5rem;">Próxima</button>`;
+          }
+          pagEl.innerHTML = html;
+        } else {
+          pagEl.innerHTML = '';
+        }
+      } catch (e) {
+        document.getElementById('results-list').innerHTML = '<p style="color: red;">Erro ao buscar. Tente novamente.</p>';
+      }
+      btn.disabled = false;
+    }
+
+    async function doCompare() {
+      const itemId = document.getElementById('my-items-select').value;
+      if (!itemId) {
+        alert('Selecione um anúncio para comparar.');
+        return;
+      }
+      const btn = document.getElementById('btn-compare');
+      btn.disabled = true;
+      document.getElementById('results-area').style.display = 'none';
+      document.getElementById('compare-results-area').style.display = 'block';
+      document.getElementById('compare-list').innerHTML = '<p>Comparando...</p>';
+
+      try {
+        const res = await authFetch(`${API_BASE}/api/ml/compare/${itemId}`);
+        if (res.status === 403) {
+          document.getElementById('ml-not-connected').style.display = 'block';
+          return;
+        }
+        if (!res.ok) throw new Error('Erro na comparação');
+        const data = await res.json();
+        const { my_item, results, search_term, user_position, total_results, in_top_50 } = data;
+
+        document.getElementById('compare-title').textContent = my_item.title || my_item.id;
+
+        let summary = `Termo de busca: "${search_term}". Total de anúncios: ${total_results}.`;
+        if (user_position !== null) {
+          summary += ` Seu anúncio está na posição <strong>#${user_position}</strong> entre os primeiros resultados.`;
+        } else {
+          summary += ` Seu anúncio não aparece nos primeiros 50 resultados desta busca.`;
+        }
+        document.getElementById('compare-summary').innerHTML = summary;
+
+        const myPrice = my_item.price || 0;
+        const prices = results.map(r => r.price || 0).filter(p => p > 0);
+        const avgPrice = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+        const priceDiff = myPrice && avgPrice ? ((myPrice - avgPrice) / avgPrice * 100).toFixed(1) : null;
+
+        let listHtml = '';
+        if (priceDiff !== null) {
+          listHtml += `<p style="margin-bottom: 1rem;">Seu preço: <strong>${formatPrice(myPrice)}</strong>. Preço médio dos concorrentes: ${formatPrice(avgPrice)}. ${parseFloat(priceDiff) > 0 ? 'Você está acima da média em ' + priceDiff + '%.' : 'Você está abaixo da média em ' + Math.abs(parseFloat(priceDiff)) + '%.'}</p>`;
+        }
+
+        listHtml += results.map((r, i) => {
+          const pos = i + 1;
+          const isMine = r.id === itemId;
+          const thumb = r.thumbnail || '';
+          const price = formatPrice(r.price);
+          const sold = r.sold_quantity || 0;
+          const link = r.permalink || `https://produto.mercadolivre.com.br/${r.id}`;
+          return `
+            <div class="result-row ${isMine ? 'mine' : ''}">
+              <span class="pos">#${pos}</span>
+              ${thumb ? `<img class="thumb" src="${thumb}" alt="">` : ''}
+              <div class="info">
+                ${isMine ? '<span class="badge">Seu anúncio</span> ' : ''}
+                <a href="${link}" target="_blank" style="color: var(--primary); text-decoration: none;">${r.title || 'Sem título'}</a>
+                <div style="margin-top: 0.25rem;">
+                  <span class="price">${price}</span>
+                  ${sold > 0 ? `<span class="badge" style="margin-left: 0.5rem;">${sold} vendidos</span>` : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        document.getElementById('compare-list').innerHTML = listHtml;
+      } catch (e) {
+        document.getElementById('compare-list').innerHTML = '<p style="color: red;">Erro ao comparar. Verifique se o anúncio está ativo e tente novamente.</p>';
+      }
+      btn.disabled = false;
+    }
+
+    async function init() {
+      await initClerkAuth({ signInContainerId: 'clerk-signin', userButtonContainerId: 'clerk-user-button', appContentId: 'app-content' });
+      if (!window.ClerkAuth?.signedIn) return;
+
+      const ok = await checkAccess();
+      if (!ok) return;
+
+      document.getElementById('btn-search').addEventListener('click', () => doSearch(0));
+      document.getElementById('search-input').addEventListener('keypress', e => {
+        if (e.key === 'Enter') doSearch(0);
+      });
+      document.getElementById('btn-compare').addEventListener('click', doCompare);
+    }
+
+    init();
+  </script>
 </body>
 </html>

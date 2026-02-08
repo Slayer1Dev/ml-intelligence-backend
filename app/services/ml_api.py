@@ -151,6 +151,26 @@ def get_order_details(access_token: str, order_id: str) -> Optional[dict]:
     return resp.json()
 
 
+def search_public(site_id: str = "MLB", q: str = "", limit: int = 50, offset: int = 0, sort: Optional[str] = None) -> Optional[dict]:
+    """Busca pública no Mercado Livre (não requer token).
+    
+    Retorna anúncios do marketplace com: id, title, price, sold_quantity, permalink, etc.
+    """
+    if not q or not q.strip():
+        return None
+    params = {
+        "q": q.strip()[:100],
+        "limit": min(limit, 50),
+        "offset": offset,
+    }
+    if sort:
+        params["sort"] = sort
+    resp = requests.get(f"{ML_API}/sites/{site_id}/search", params=params, timeout=15)
+    if resp.status_code != 200:
+        return None
+    return resp.json()
+
+
 def get_multiple_items(access_token: str, item_ids: List[str]) -> Optional[List[dict]]:
     """Busca múltiplos itens de uma vez (máx 20 por requisição).
     

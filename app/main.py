@@ -89,6 +89,7 @@ from app.services.ml_api import (
     get_orders,
     get_order_details,
     get_multiple_items,
+    search_public,
 )
 
 # ------------------------------------------------------------------
@@ -478,6 +479,72 @@ def ml_order_details(order_id: str, user: User = Depends(paid_guard)):
         )
     
     return order
+
+
+@app.get("/api/ml/search")
+def ml_search(
+    q: str = "",
+    limit: int = 50,
+    offset: int = 0,
+    sort: Optional[str] = None,
+    user: User = Depends(paid_guard),
+):
+    """Busca pública no ML — lista concorrentes por termo."""
+    if not q or len(q.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Digite pelo menos 2 caracteres para buscar.")
+    result = search_public(site_id="MLB", q=q.strip(), limit=limit, offset=offset, sort=sort)
+    if result is None:
+        raise HTTPException(status_code=500, detail="Erro ao buscar no Mercado Livre.")
+    return result
+
+
+@app.get("/api/ml/compare/{item_id}")
+def ml_compare(
+    item_id: str,
+    user: User = Depends(paid_guard),
+):
+    """Compara um anúncio do usuário com concorrentes na busca do ML."""
+    token = get_valid_ml_token(user)
+    if not token or not token.seller_id:
+        raise HTTPException(status_code=403, detail="ml_not_connected")
+    
+    item = get_item_details(token.access_token, item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Anúncio não encontrado.")
+    
+    # Busca por título ou categoria
+    search_term = item.get("title", "").strip()
+    if not search_term and item.get("category_id"):
+        search_term = item.get("category_id", "")
+    if not search_term or len(search_term) < 2:
+        raise HTTPException(status_code=400, detail="Não foi possível definir termo de busca para este anúncio.")
+    
+    # Busca até 50 resultados para encontrar a posição do usuário
+    result = search_public(site_id="MLB", q=search_term[:80], limit=50, offset=0)
+    if result is None:
+        raise HTTPException(status_code=500, detail="Erro ao buscar concorrentes.")
+    
+    results = result.get("results", [])
+    paging = result.get("paging", {})
+    total_results = paging.get("total", 0)
+    
+    # Encontra a posição do item do usuário (0-indexed)
+    user_position = None
+    for i, r in enumerate(results):
+        rid = r.get("id") if isinstance(r, dict) else None
+        if rid == item_id:
+            user_position = i + 1
+            break
+    
+    return {
+        "my_item": item,
+        "search_term": search_term,
+        "results": results,
+        "paging": paging,
+        "user_position": user_position,
+        "total_results": total_results,
+        "in_top_50": user_position is not None,
+    }
 
 
 @app.get("/api/ml/metrics")
