@@ -19,7 +19,8 @@ _connect_args = {}
 if "sqlite" in _DB_PATH:
     _connect_args["check_same_thread"] = False
 
-engine = create_engine(_DB_PATH, connect_args=_connect_args or None)
+# SQLAlchemy exige connect_args como dict; None causa TypeError no create_engine
+engine = create_engine(_DB_PATH, connect_args=_connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
