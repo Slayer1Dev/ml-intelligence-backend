@@ -13,6 +13,14 @@
     .search-box { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
     .search-box input { flex: 1; min-width: 200px; padding: 0.75rem 1rem; border: 1px solid var(--gray-light); border-radius: 8px; font-size: 1rem; }
     .search-box input:focus { outline: none; border-color: var(--primary); }
+    .btn-concorrentes {
+      padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 600; cursor: pointer; border: none;
+      background: var(--blue-primary); color: white; font-size: 0.95rem;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn-concorrentes:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(30, 64, 175, 0.35); }
+    .btn-concorrentes:active { transform: translateY(0); }
+    .btn-concorrentes:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
     .compare-section { background: var(--blue-light, #eff6ff); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
     .result-row { display: flex; gap: 1rem; align-items: center; padding: 1rem; border-bottom: 1px solid #eee; }
     .result-row:last-child { border-bottom: none; }
@@ -78,7 +86,7 @@
               <option value="price_desc">Maior preço</option>
               <option value="sales_desc">Mais vendidos</option>
             </select>
-            <button type="button" id="btn-search" class="button">Buscar</button>
+            <button type="button" id="btn-search" class="btn-concorrentes">Buscar</button>
           </div>
         </div>
 
@@ -90,7 +98,7 @@
             <select id="my-items-select" style="flex: 1; min-width: 200px; padding: 0.75rem; border: 1px solid var(--gray-light); border-radius: 8px;">
               <option value="">Carregando seus anúncios...</option>
             </select>
-            <button type="button" id="btn-compare" class="button">Comparar</button>
+            <button type="button" id="btn-compare" class="btn-concorrentes">Comparar</button>
           </div>
         </div>
 
@@ -213,7 +221,10 @@
           btn.disabled = false;
           return;
         }
-        if (!res.ok) throw new Error('Erro na busca');
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || (res.status === 503 ? 'Busca temporariamente indisponível. Tente reconectar sua conta no dashboard.' : 'Erro na busca'));
+        }
         const data = await res.json();
         const results = data.results || [];
         const paging = data.paging || {};
@@ -263,7 +274,7 @@
           pagEl.innerHTML = '';
         }
       } catch (e) {
-        document.getElementById('results-list').innerHTML = '<p style="color: red;">Erro ao buscar. Tente novamente.</p>';
+        document.getElementById('results-list').innerHTML = '<p style="color: red;">' + (e.message || 'Erro ao buscar. Tente novamente.') + '</p>';
       }
       btn.disabled = false;
     }
@@ -286,7 +297,10 @@
           document.getElementById('ml-not-connected').style.display = 'block';
           return;
         }
-        if (!res.ok) throw new Error('Erro na comparação');
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || (res.status === 503 ? 'Comparação temporariamente indisponível.' : 'Erro na comparação'));
+        }
         const data = await res.json();
         const { my_item, results, search_term, user_position, total_results, in_top_50 } = data;
 
@@ -335,7 +349,7 @@
 
         document.getElementById('compare-list').innerHTML = listHtml;
       } catch (e) {
-        document.getElementById('compare-list').innerHTML = '<p style="color: red;">Erro ao comparar. Verifique se o anúncio está ativo e tente novamente.</p>';
+        document.getElementById('compare-list').innerHTML = '<p style="color: red;">' + (e.message || 'Erro ao comparar. Verifique se o anúncio está ativo e tente novamente.') + '</p>';
       }
       btn.disabled = false;
     }

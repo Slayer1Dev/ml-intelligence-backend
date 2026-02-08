@@ -66,7 +66,7 @@ app.add_middleware(
 # ------------------------------------------------------------------
 # *Se der ImportError, colocar os módulos no PYTHONPATH ou ajustar import relativo*
 from app.database import SessionLocal, init_db
-from app.models import ItemCost, MlToken, Subscription, User
+from app.models import AuditLog, ItemCost, MlToken, Subscription, User
 from app.services.sheets_reader import read_sheet
 from app.services.normalizer import normalize_concorrentes
 from app.services.ai_agent import analyze_market, analyze_uploaded_sheet
@@ -527,14 +527,19 @@ def ml_search(
     sort: Optional[str] = None,
     user: User = Depends(paid_guard),
 ):
-    """Busca no ML — lista concorrentes por termo. Usa token do usuário se disponível."""
+    """Busca no ML — lista concorrentes por termo. Tenta com token; se falhar, tenta busca pública."""
     if not q or len(q.strip()) < 2:
         raise HTTPException(status_code=400, detail="Digite pelo menos 2 caracteres para buscar.")
     token = get_valid_ml_token(user)
     access_token = token.access_token if token else None
     result = search_public(site_id="MLB", q=q.strip(), limit=limit, offset=offset, sort=sort, access_token=access_token)
+    if result is None and access_token:
+        result = search_public(site_id="MLB", q=q.strip(), limit=limit, offset=offset, sort=sort, access_token=None)
     if result is None:
-        raise HTTPException(status_code=500, detail="Erro ao buscar no Mercado Livre.")
+        raise HTTPException(
+            status_code=503,
+            detail="Busca indisponível. Tente reconectar sua conta no dashboard ou verifique a conexão.",
+        )
     return result
 
 
@@ -562,7 +567,12 @@ def ml_compare(
     # Busca até 50 resultados para encontrar a posição do usuário
     result = search_public(site_id="MLB", q=search_term[:80], limit=50, offset=0, access_token=token.access_token)
     if result is None:
-        raise HTTPException(status_code=500, detail="Erro ao buscar concorrentes.")
+        result = search_public(site_id="MLB", q=search_term[:80], limit=50, offset=0, access_token=None)
+    if result is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Comparação indisponível. Tente reconectar sua conta no dashboard.",
+        )
     
     results = result.get("results", [])
     paging = result.get("paging", {})
@@ -721,6 +731,18 @@ def _compute_financial_panel(user: User) -> dict:
     return {"metrics": {"total_listings": total_listings, "active_listings": active_listings, "total_stock": total_stock, "avg_price": round(avg_price, 2), "avg_fee_pct": round(avg_fee, 2), "profit_mean": round(profit_mean, 2), "margin_mean": round(margin_mean, 2), "profit_total": round(profit_total, 2), "fee_total": round(fee_total, 2), "missing_cost": missing_cost}, "items": items, "top_profit": [{"ITEM_ID": i["id"], "SKU_STR": i["sku"], "TITLE": i["title"], "PRICE_NUM": i["price"], "COST": i["custo_produto"], "PROFIT": i["profit"], "MARGIN_PCT": i["margin_pct"]} for i in top_profit]}
 
 
+def _log_ia_failure(user_id: Optional[int], event_type: str, message: str, extra: Optional[str] = None):
+    """Registra falha de IA no audit_log para admin."""
+    db = SessionLocal()
+    try:
+        db.add(AuditLog(user_id=user_id, event_type=event_type, message=message[:512], extra=(extra or "")[:1024]))
+        db.commit()
+    except Exception as ex:
+        logger.warning("Falha ao registrar audit_log: %s", ex)
+    finally:
+        db.close()
+
+
 @app.post("/api/financial-panel/ai-insights")
 def financial_ai_insights(user: User = Depends(paid_guard)):
     """Gera insights de IA sobre o painel financeiro."""
@@ -743,6 +765,7 @@ Retorne APENAS o JSON, sem markdown."""
         out = run_market_analysis(prompt)
         return out
     except Exception as e:
+        _log_ia_failure(user.id, "ia_insights_fail", str(e)[:512], f"user_id={user.id}")
         logger.exception("Erro ao gerar insights IA: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -998,17 +1021,90 @@ async def mercado_pago_webhook(request: Request):
     return {"received": True}
 
 
+@app.get("/api/admin/audit-logs")
+def admin_audit_logs(
+    event_type: Optional[str] = None,
+    limit: int = 100,
+    admin_user: User = Depends(admin_guard),
+):
+    """Lista logs de auditoria (falhas IA, etc.) — admin."""
+    db = SessionLocal()
+    try:
+        q = db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit)
+        if event_type:
+            q = q.filter(AuditLog.event_type == event_type)
+        logs = q.all()
+        return [
+            {"id": l.id, "user_id": l.user_id, "event_type": l.event_type, "message": l.message, "extra": l.extra, "created_at": l.created_at.isoformat() if l.created_at else None}
+            for l in logs
+        ]
+    finally:
+        db.close()
+
+
+@app.get("/api/admin/metrics")
+def admin_metrics(admin_user: User = Depends(admin_guard)):
+    """Métricas do sistema para gestão (admin)."""
+    db = SessionLocal()
+    try:
+        total_users = db.query(User).count()
+        active_plan = db.query(User).filter(User.plan == "active").count()
+        free_plan = db.query(User).filter(User.plan == "free").count()
+        subs = db.query(Subscription).filter(Subscription.status == "active").count()
+        ml_connected = db.query(MlToken).count()
+        return {
+            "total_users": total_users,
+            "users_active_plan": active_plan,
+            "users_free_plan": free_plan,
+            "subscriptions_active": subs,
+            "ml_accounts_connected": ml_connected,
+        }
+    finally:
+        db.close()
+
+
+class AdminUpdatePlan(BaseModel):
+    plan: str  # free | active
+
+
+@app.patch("/api/admin/users/{user_id}/plan")
+def admin_update_user_plan(
+    user_id: int,
+    data: AdminUpdatePlan,
+    admin_user: User = Depends(admin_guard),
+):
+    """Altera o plano de um usuário (admin)."""
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+        if data.plan not in ("free", "active"):
+            raise HTTPException(status_code=400, detail="Plano inválido. Use 'free' ou 'active'.")
+        user.plan = data.plan
+        db.commit()
+        return {"ok": True, "user_id": user_id, "plan": data.plan}
+    finally:
+        db.close()
+
+
 @app.get("/api/admin/logs")
 def admin_logs(admin_user: User = Depends(admin_guard)):
     """Retorna logs do backend (admin)."""
     if not LOG_FILE.exists():
-        return PlainTextResponse("Arquivo de log ainda não criado.")
+        return PlainTextResponse("Arquivo de log ainda não criado. O backend registrará eventos aqui ao processar requisições.")
     try:
         text = LOG_FILE.read_text(encoding="utf-8", errors="ignore")
+        if not text.strip():
+            return PlainTextResponse("(Arquivo de log vazio)\n\nO backend registrará eventos aqui quando houver atividade.")
+        # Últimas ~500 linhas para não sobrecarregar
+        lines = text.strip().split("\n")
+        if len(lines) > 500:
+            text = "\n".join(lines[-500:])
+        return PlainTextResponse(text, media_type="text/plain")
     except Exception as e:
         logger.exception(f"Erro ao ler log: {e}")
         return PlainTextResponse(f"Erro ao ler logs: {e}")
-    return PlainTextResponse(text, media_type="text/plain")
 
 # ------------------------------------------------------------------
 # Frontend estático (caminho absoluto para funcionar de qualquer pasta)

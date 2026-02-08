@@ -25,15 +25,24 @@
         <a href="dashboard.html">← Voltar</a>
         <hr style="margin: 0.5rem 0; border-color: var(--gray-light);">
         <a href="admin.html" class="active">Admin</a>
+        <a href="#" data-tab="metrics">Métricas</a>
         <a href="#" data-tab="users">Usuários</a>
         <a href="#" data-tab="subscriptions">Assinaturas</a>
         <a href="#" data-tab="logs">Logs</a>
+        <a href="#" data-tab="audit">Logs IA</a>
       </nav>
     </aside>
 
     <main class="app-main">
       <h1>Painel Admin</h1>
       <p class="subtitle">Gestão de usuários, assinaturas e logs do sistema.</p>
+
+      <div id="tab-metrics" class="tab-content" style="display:none;">
+        <div class="card">
+          <h2 style="margin-bottom: 1rem;">Métricas do Sistema</h2>
+          <div id="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem;">Carregando…</div>
+        </div>
+      </div>
 
       <div id="tab-users" class="tab-content" style="display:none;">
         <div class="card">
@@ -56,6 +65,13 @@
         </div>
       </div>
 
+      <div id="tab-audit" class="tab-content" style="display:none;">
+        <div class="card">
+          <h2 style="margin-bottom: 1rem;">Logs de IA (falhas e eventos)</h2>
+          <div id="audit-list">Carregando…</div>
+        </div>
+      </div>
+
       <div id="tab-welcome" class="tab-content">
         <div class="card">
           <p style="color: var(--gray);">Selecione uma opção no menu ao lado.</p>
@@ -67,6 +83,39 @@
   <script src="clerk-auth.js"></script>
   <script>
     const API_BASE = window.location.origin;
+
+    async function loadMetrics() {
+      const el = document.getElementById('metrics-grid');
+      try {
+        const res = await authFetch(`${API_BASE}/api/admin/metrics`);
+        if (!res.ok) { el.innerHTML = '<p style="color:red;">Erro ao carregar métricas.</p>'; return; }
+        const m = await res.json();
+        el.innerHTML = `
+          <div style="padding: 1rem; background: #f8fafc; border-radius: 8px;"><strong>Usuários totais</strong><div style="font-size: 1.5rem; color: var(--blue-primary);">${m.total_users || 0}</div></div>
+          <div style="padding: 1rem; background: #f0fdf4; border-radius: 8px;"><strong>Com plano ativo</strong><div style="font-size: 1.5rem; color: #22c55e;">${m.users_active_plan || 0}</div></div>
+          <div style="padding: 1rem; background: #f8fafc; border-radius: 8px;"><strong>Plano free</strong><div style="font-size: 1.5rem; color: #64748b;">${m.users_free_plan || 0}</div></div>
+          <div style="padding: 1rem; background: #eff6ff; border-radius: 8px;"><strong>Assinaturas ativas</strong><div style="font-size: 1.5rem; color: #1e40af;">${m.subscriptions_active || 0}</div></div>
+          <div style="padding: 1rem; background: #fef3c7; border-radius: 8px;"><strong>Contas ML conectadas</strong><div style="font-size: 1.5rem; color: #b45309;">${m.ml_accounts_connected || 0}</div></div>
+        `;
+      } catch (e) {
+        el.innerHTML = '<p style="color:red;">Erro: ' + e.message + '</p>';
+      }
+    }
+
+    async function updateUserPlan(userId, plan) {
+      try {
+        const res = await authFetch(`${API_BASE}/api/admin/users/${userId}/plan`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan })
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Erro'); }
+        alert('Plano atualizado.');
+        loadUsers();
+      } catch (e) {
+        alert('Erro: ' + e.message);
+      }
+    }
 
     async function loadUsers() {
       const el = document.getElementById('users-list');
@@ -88,6 +137,7 @@
               <tr style="text-align:left; border-bottom: 1px solid var(--gray-light);">
                 <th style="padding: 0.5rem;">Email</th>
                 <th style="padding: 0.5rem;">Plano</th>
+                <th style="padding: 0.5rem;">Ações</th>
                 <th style="padding: 0.5rem;">Criado em</th>
               </tr>
             </thead>
@@ -96,12 +146,19 @@
                 <tr style="border-bottom: 1px solid #eee;">
                   <td style="padding: 0.5rem;">${u.email || '-'}</td>
                   <td style="padding: 0.5rem;"><span style="background: ${u.plan === 'active' ? '#22c55e' : '#94a3b8'}; color: white; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">${u.plan}</span></td>
+                  <td style="padding: 0.5rem;">
+                    <button type="button" class="btn-plan" data-id="${u.id}" data-plan="active" ${u.plan === 'active' ? 'disabled' : ''} style="padding: 0.25rem 0.5rem; margin-right: 0.25rem; font-size: 0.8rem; border-radius: 4px; cursor: pointer; border: 1px solid #22c55e; background: #fff; color: #22c55e;">Pro</button>
+                    <button type="button" class="btn-plan" data-id="${u.id}" data-plan="free" ${u.plan === 'free' ? 'disabled' : ''} style="padding: 0.25rem 0.5rem; font-size: 0.8rem; border-radius: 4px; cursor: pointer; border: 1px solid #94a3b8; background: #fff; color: #64748b;">Free</button>
+                  </td>
                   <td style="padding: 0.5rem; font-size: 0.85rem;">${u.created_at ? new Date(u.created_at).toLocaleString('pt-BR') : '-'}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
         `;
+        el.querySelectorAll('.btn-plan').forEach(btn => {
+          btn.addEventListener('click', () => updateUserPlan(btn.dataset.id, btn.dataset.plan));
+        });
       } catch (e) {
         el.innerHTML = '<p style="color:red;">Erro: ' + e.message + '</p>';
       }
@@ -129,15 +186,54 @@
                 <th style="padding: 0.5rem;">Status</th>
                 <th style="padding: 0.5rem;">Stripe ID</th>
                 <th style="padding: 0.5rem;">Início</th>
+                <th style="padding: 0.5rem;">Expira em</th>
               </tr>
             </thead>
             <tbody>
               ${subs.map(s => `
                 <tr style="border-bottom: 1px solid #eee;">
                   <td style="padding: 0.5rem;">${s.user_email || '-'}</td>
-                  <td style="padding: 0.5rem;">${s.status}</td>
+                  <td style="padding: 0.5rem;"><span style="background: ${s.status === 'active' ? '#22c55e' : '#94a3b8'}; color: white; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">${s.status}</span></td>
                   <td style="padding: 0.5rem; font-size: 0.8rem;">${s.stripe_subscription_id || '-'}</td>
                   <td style="padding: 0.5rem; font-size: 0.85rem;">${s.started_at ? new Date(s.started_at).toLocaleString('pt-BR') : '-'}</td>
+                  <td style="padding: 0.5rem; font-size: 0.85rem;">${s.ends_at ? new Date(s.ends_at).toLocaleString('pt-BR') : '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch (e) {
+        el.innerHTML = '<p style="color:red;">Erro: ' + e.message + '</p>';
+      }
+    }
+
+    async function loadAuditLogs() {
+      const el = document.getElementById('audit-list');
+      try {
+        const res = await authFetch(`${API_BASE}/api/admin/audit-logs?limit=100`);
+        if (!res.ok) { el.innerHTML = '<p style="color:red;">Erro ao carregar logs de IA.</p>'; return; }
+        const logs = await res.json();
+        if (logs.length === 0) {
+          el.innerHTML = '<p style="color: var(--gray);">Nenhum evento registrado.</p>';
+          return;
+        }
+        el.innerHTML = `
+          <table style="width:100%; border-collapse: collapse;">
+            <thead>
+              <tr style="text-align:left; border-bottom: 1px solid var(--gray-light);">
+                <th style="padding: 0.5rem;">Data</th>
+                <th style="padding: 0.5rem;">Tipo</th>
+                <th style="padding: 0.5rem;">Mensagem</th>
+                <th style="padding: 0.5rem;">User ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${logs.map(l => `
+                <tr style="border-bottom: 1px solid #eee;">
+                  <td style="padding: 0.5rem; font-size: 0.85rem;">${l.created_at ? new Date(l.created_at).toLocaleString('pt-BR') : '-'}</td>
+                  <td style="padding: 0.5rem;"><span style="background: #fef3c7; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">${l.event_type || '-'}</span></td>
+                  <td style="padding: 0.5rem; font-size: 0.85rem;">${(l.message || '-').substring(0, 80)}${(l.message || '').length > 80 ? '...' : ''}</td>
+                  <td style="padding: 0.5rem;">${l.user_id || '-'}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -167,9 +263,11 @@
       const link = document.querySelector(`a[data-tab="${tabId}"]`);
       if (content) content.style.display = 'block';
       if (link) link.classList.add('active');
+      if (tabId === 'metrics') loadMetrics();
       if (tabId === 'users') loadUsers();
       if (tabId === 'subscriptions') loadSubscriptions();
       if (tabId === 'logs') loadLogs();
+      if (tabId === 'audit') loadAuditLogs();
     }
 
     async function init() {

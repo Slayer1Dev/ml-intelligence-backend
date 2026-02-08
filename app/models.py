@@ -66,3 +66,15 @@ class ItemCost(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = relationship("User", backref="item_costs")
+
+
+class AuditLog(Base):
+    """Log de eventos (falhas de IA, etc.) para debug e admin."""
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    event_type = Column(String(64), nullable=False, index=True)  # ia_insights_fail, ia_perguntas_fail, etc.
+    message = Column(String(512), nullable=True)
+    extra = Column(String(1024), nullable=True)  # JSON ou texto
+    created_at = Column(DateTime, default=datetime.utcnow)

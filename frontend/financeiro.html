@@ -19,25 +19,27 @@
     .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
     .cost-input { width: 70px; padding: 0.3rem; }
     #items-table td, #items-table th { padding: 0.5rem; font-size: 0.9rem; }
-    .btn-insights {
-      background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
-      color: white;
-      border: none;
+    .btn-primary-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
       padding: 0.5rem 1rem;
       border-radius: 8px;
       font-weight: 600;
       cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
+      border: none;
       transition: transform 0.2s, box-shadow 0.2s;
+      background: var(--blue-primary);
+      color: white;
+      font-size: 0.95rem;
     }
-    .btn-insights:hover {
+    .btn-primary-actions:hover {
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+      box-shadow: 0 4px 12px rgba(30, 64, 175, 0.35);
     }
-    .btn-insights:active { transform: translateY(0); }
-    .btn-insights-icon { font-size: 1rem; }
+    .btn-primary-actions:active { transform: translateY(0); }
+    .btn-primary-actions.btn-insights { background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%); }
+    .btn-primary-actions.btn-insights:hover { box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4); }
   </style>
 </head>
 <body class="app">
@@ -79,10 +81,8 @@
         <div id="ml-loaded" style="display: none;">
           <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
-              <button type="button" id="btn-refresh-ml" class="button">Atualizar dados do ML</button>
-              <button type="button" id="btn-ai-insights" class="button btn-insights">
-                <span class="btn-insights-icon">✨</span> Insights de IA
-              </button>
+              <button type="button" id="btn-refresh-ml" class="btn-primary-actions">🔄 Atualizar dados do ML</button>
+              <button type="button" id="btn-ai-insights" class="btn-primary-actions btn-insights">✨ Insights de IA</button>
               <span id="last-update" style="color: var(--gray); font-size: 0.9rem;"></span>
             </div>
           </div>
@@ -132,9 +132,12 @@
           <div class="card"><div class="metric-label">Itens sem custo</div><div class="metric-value" id="metricMissingCost">-</div></div>
         </div>
 
-        <div class="card chart-card" style="margin-top: 1.5rem;">
+        <div class="card chart-card" style="margin-top: 1.5rem; min-height: 180px;">
           <h3 style="margin-bottom: 1rem; color: var(--blue-primary);">Top 10 por lucro</h3>
-          <canvas id="profitChart" height="120"></canvas>
+          <div id="chart-placeholder" style="display: none; color: var(--gray); padding: 2rem; text-align: center;">Cadastre custos para ver o gráfico de lucro.</div>
+          <div id="chart-container" style="position: relative; height: 220px;">
+            <canvas id="profitChart"></canvas>
+          </div>
         </div>
 
         <div class="card" style="margin-top: 1.5rem;">
@@ -210,15 +213,43 @@
     }
 
     function renderChart(topProfit) {
-      const labels = (topProfit || []).map(r => (r.SKU_STR || r.ITEM_ID || '').substring(0, 15));
-      const values = (topProfit || []).map(r => r.PROFIT || 0);
+      const data = topProfit || [];
+      const placeholder = document.getElementById('chart-placeholder');
+      const container = document.getElementById('chart-container');
       const ctx = document.getElementById('profitChart');
       if (!ctx) return;
       if (chart) chart.destroy();
+      chart = null;
+      if (data.length === 0) {
+        if (placeholder) placeholder.style.display = 'block';
+        if (container) container.style.display = 'none';
+        return;
+      }
+      if (placeholder) placeholder.style.display = 'none';
+      if (container) container.style.display = 'block';
+      const labels = data.map(r => (r.SKU_STR || r.ITEM_ID || r.TITLE || '-').toString().substring(0, 18));
+      const values = data.map(r => r.PROFIT || 0);
+      const maxVal = Math.max(...values, 1);
+      const barThickness = data.length <= 3 ? 36 : Math.min(48, Math.max(20, 280 / data.length));
       chart = new Chart(ctx.getContext('2d'), {
         type: 'bar',
-        data: { labels, datasets: [{ label: 'Lucro (R$)', data: values, backgroundColor: '#1e40af' }] },
-        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: v => 'R$ ' + v } } } }
+        data: { labels, datasets: [{ label: 'Lucro (R$)', data: values, backgroundColor: 'rgba(30, 64, 175, 0.85)', barThickness, maxBarThickness: 60 }] },
+        options: {
+          indexAxis: data.length <= 4 ? 'y' : 'x',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: maxVal * 1.2,
+              ticks: { callback: v => 'R$ ' + (typeof v === 'number' ? v.toLocaleString('pt-BR') : v) }
+            },
+            x: {
+              ticks: { maxRotation: data.length <= 6 ? 0 : 45, font: { size: 11 } }
+            }
+          }
+        }
       });
     }
 
@@ -305,7 +336,7 @@
       content.innerHTML = '<p>Gerando insights...</p>';
       box.style.display = 'block';
       try {
-        const res = await authFetch(`${API_URL}/api/financial-panel/ai-insights`);
+        const res = await authFetch(`${API_URL}/api/financial-panel/ai-insights`, { method: 'POST' });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Erro');
         let html = '';
