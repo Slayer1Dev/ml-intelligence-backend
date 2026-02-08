@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — ML Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body class="app">
+  <header class="app-header">
+    <a href="dashboard.html" class="app-logo">ML Intelligence</a>
+    <span class="app-user">Admin</span>
+    <div id="clerk-user-button"></div>
+  </header>
+
+  <div id="clerk-signin" style="display:none;"></div>
+
+  <div id="app-content" class="app-body">
+    <aside class="app-sidebar">
+      <nav>
+        <a href="dashboard.html">← Voltar</a>
+        <hr style="margin: 0.5rem 0; border-color: var(--gray-light);">
+        <a href="admin.html" class="active">Admin</a>
+        <a href="#" data-tab="users">Usuários</a>
+        <a href="#" data-tab="subscriptions">Assinaturas</a>
+        <a href="#" data-tab="logs">Logs</a>
+      </nav>
+    </aside>
+
+    <main class="app-main">
+      <h1>Painel Admin</h1>
+      <p class="subtitle">Gestão de usuários, assinaturas e logs do sistema.</p>
+
+      <div id="tab-users" class="tab-content" style="display:none;">
+        <div class="card">
+          <h2 style="margin-bottom: 1rem;">Usuários</h2>
+          <div id="users-list">Carregando…</div>
+        </div>
+      </div>
+
+      <div id="tab-subscriptions" class="tab-content" style="display:none;">
+        <div class="card">
+          <h2 style="margin-bottom: 1rem;">Assinaturas</h2>
+          <div id="subscriptions-list">Carregando…</div>
+        </div>
+      </div>
+
+      <div id="tab-logs" class="tab-content" style="display:none;">
+        <div class="card">
+          <h2 style="margin-bottom: 1rem;">Logs do Backend</h2>
+          <pre id="logs-content" style="background: #0f172a; color: #e2e8f0; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; max-height: 60vh; overflow-y: auto;">Carregando…</pre>
+        </div>
+      </div>
+
+      <div id="tab-welcome" class="tab-content">
+        <div class="card">
+          <p style="color: var(--gray);">Selecione uma opção no menu ao lado.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="clerk-auth.js"></script>
+  <script>
+    const API_BASE = window.location.origin;
+
+    async function loadUsers() {
+      const el = document.getElementById('users-list');
+      try {
+        const res = await authFetch(`${API_BASE}/api/admin/users`);
+        if (!res.ok) {
+          if (res.status === 403) el.innerHTML = '<p style="color:red;">Acesso negado.</p>';
+          else el.innerHTML = '<p style="color:red;">Erro ao carregar usuários.</p>';
+          return;
+        }
+        const users = await res.json();
+        if (users.length === 0) {
+          el.innerHTML = '<p style="color:var(--gray);">Nenhum usuário cadastrado.</p>';
+          return;
+        }
+        el.innerHTML = `
+          <table style="width:100%; border-collapse: collapse;">
+            <thead>
+              <tr style="text-align:left; border-bottom: 1px solid var(--gray-light);">
+                <th style="padding: 0.5rem;">Email</th>
+                <th style="padding: 0.5rem;">Plano</th>
+                <th style="padding: 0.5rem;">Criado em</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${users.map(u => `
+                <tr style="border-bottom: 1px solid #eee;">
+                  <td style="padding: 0.5rem;">${u.email || '-'}</td>
+                  <td style="padding: 0.5rem;"><span style="background: ${u.plan === 'active' ? '#22c55e' : '#94a3b8'}; color: white; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">${u.plan}</span></td>
+                  <td style="padding: 0.5rem; font-size: 0.85rem;">${u.created_at ? new Date(u.created_at).toLocaleString('pt-BR') : '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch (e) {
+        el.innerHTML = '<p style="color:red;">Erro: ' + e.message + '</p>';
+      }
+    }
+
+    async function loadSubscriptions() {
+      const el = document.getElementById('subscriptions-list');
+      try {
+        const res = await authFetch(`${API_BASE}/api/admin/subscriptions`);
+        if (!res.ok) {
+          if (res.status === 403) el.innerHTML = '<p style="color:red;">Acesso negado.</p>';
+          else el.innerHTML = '<p style="color:red;">Erro ao carregar assinaturas.</p>';
+          return;
+        }
+        const subs = await res.json();
+        if (subs.length === 0) {
+          el.innerHTML = '<p style="color:var(--gray);">Nenhuma assinatura.</p>';
+          return;
+        }
+        el.innerHTML = `
+          <table style="width:100%; border-collapse: collapse;">
+            <thead>
+              <tr style="text-align:left; border-bottom: 1px solid var(--gray-light);">
+                <th style="padding: 0.5rem;">Usuário</th>
+                <th style="padding: 0.5rem;">Status</th>
+                <th style="padding: 0.5rem;">Stripe ID</th>
+                <th style="padding: 0.5rem;">Início</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${subs.map(s => `
+                <tr style="border-bottom: 1px solid #eee;">
+                  <td style="padding: 0.5rem;">${s.user_email || '-'}</td>
+                  <td style="padding: 0.5rem;">${s.status}</td>
+                  <td style="padding: 0.5rem; font-size: 0.8rem;">${s.stripe_subscription_id || '-'}</td>
+                  <td style="padding: 0.5rem; font-size: 0.85rem;">${s.started_at ? new Date(s.started_at).toLocaleString('pt-BR') : '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch (e) {
+        el.innerHTML = '<p style="color:red;">Erro: ' + e.message + '</p>';
+      }
+    }
+
+    async function loadLogs() {
+      const el = document.getElementById('logs-content');
+      try {
+        const res = await authFetch(`${API_BASE}/api/admin/logs`);
+        el.textContent = await res.text();
+        if (!res.ok) el.style.color = 'red';
+      } catch (e) {
+        el.textContent = 'Erro: ' + e.message;
+        el.style.color = 'red';
+      }
+    }
+
+    function showTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.app-sidebar a[data-tab]').forEach(a => a.classList.remove('active'));
+      const content = document.getElementById('tab-' + tabId);
+      const link = document.querySelector(`a[data-tab="${tabId}"]`);
+      if (content) content.style.display = 'block';
+      if (link) link.classList.add('active');
+      if (tabId === 'users') loadUsers();
+      if (tabId === 'subscriptions') loadSubscriptions();
+      if (tabId === 'logs') loadLogs();
+    }
+
+    async function init() {
+      const auth = await initClerkAuth({
+        signInContainerId: 'clerk-signin',
+        userButtonContainerId: 'clerk-user-button',
+        appContentId: 'app-content',
+      });
+      if (!auth?.signedIn) return;
+
+      const meRes = await authFetch(`${API_BASE}/api/me`);
+      const me = await meRes.json();
+      if (!me.isAdmin) {
+        document.getElementById('app-content').innerHTML = '<div class="card"><p style="color:red;">Acesso restrito a administradores.</p><a href="dashboard.html">Voltar ao dashboard</a></div>';
+        return;
+      }
+
+      document.querySelectorAll('a[data-tab]').forEach(a => {
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          showTab(a.dataset.tab);
+        });
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

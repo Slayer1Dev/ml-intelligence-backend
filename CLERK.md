@@ -19,7 +19,10 @@ CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
 CLERK_FRONTEND_API=https://seu-dominio.clerk.accounts.dev
 CLERK_JWKS_URL=https://seu-dominio.clerk.accounts.dev/.well-known/jwks.json
+ADMIN_EMAILS=seu@email.com,outro@email.com
 ```
+
+- **ADMIN_EMAILS**: e-mails (separados por vírgula) que têm acesso ao painel Admin.
 
 Onde obter:
 1. [Clerk Dashboard](https://dashboard.clerk.com) → sua aplicação

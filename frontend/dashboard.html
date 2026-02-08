@@ -22,11 +22,15 @@
     <aside class="app-sidebar">
       <nav>
         <a href="dashboard.html" class="active">Resumo</a>
-        <a href="financeiro.html">Painel Financeiro</a>
+        <a href="financeiro.html" data-paid>Painel Financeiro</a>
         <a href="calculator.html">Calculadora de Lucro</a>
-        <a href="anuncios.html">Meus Anuncios</a>
-        <a href="performance.html">Performance</a>
-        <a href="concorrentes.html">Concorrentes</a>
+        <a href="anuncios.html" data-paid>Meus Anuncios</a>
+        <a href="performance.html" data-paid>Performance</a>
+        <a href="concorrentes.html" data-paid>Concorrentes</a>
+        <span id="admin-link-wrap" style="display:none;">
+          <hr style="margin: 0.5rem 0; border-color: var(--gray-light);">
+          <a href="admin.html">⚙️ Admin</a>
+        </span>
       </nav>
     </aside>
 
@@ -34,8 +38,8 @@
       <h1>Resumo</h1>
       <p class="subtitle">Visao geral da sua operacao. Acesse as ferramentas abaixo.</p>
 
-      <div class="grid">
-        <a href="financeiro.html" class="card card-link">
+      <div class="grid" id="dashboard-grid">
+        <a href="financeiro.html" class="card card-link" data-paid>
           <span style="font-size: 2rem; margin-bottom: 0.75rem; display: block;">💰</span>
           <strong>Painel Financeiro</strong>
           <p style="margin-top: 0.5rem; font-size: 0.9rem;">Indicadores de lucro e margem por anuncio.</p>
@@ -45,37 +49,106 @@
           <strong>Calculadora de Lucro</strong>
           <p style="margin-top: 0.5rem; font-size: 0.9rem;">Calcule custo, taxa e margem de cada venda.</p>
         </a>
-        <a href="anuncios.html" class="card card-link">
+        <a href="anuncios.html" class="card card-link" data-paid>
           <span style="font-size: 2rem; margin-bottom: 0.75rem; display: block;">📦</span>
           <strong>Meus Anuncios</strong>
           <p style="margin-top: 0.5rem; font-size: 0.9rem;">Visualize e analise suas publicacoes com IA.</p>
         </a>
-        <a href="performance.html" class="card card-link">
+        <a href="performance.html" class="card card-link" data-paid>
           <span style="font-size: 2rem; margin-bottom: 0.75rem; display: block;">📈</span>
           <strong>Performance</strong>
           <p style="margin-top: 0.5rem; font-size: 0.9rem;">Graficos e metricas da sua conta.</p>
         </a>
-        <a href="concorrentes.html" class="card card-link">
+        <a href="concorrentes.html" class="card card-link" data-paid>
           <span style="font-size: 2rem; margin-bottom: 0.75rem; display: block;">🔍</span>
           <strong>Concorrentes</strong>
           <p style="margin-top: 0.5rem; font-size: 0.9rem;">Acompanhe o mercado e seu posicionamento.</p>
         </a>
       </div>
 
-      <div class="card" style="margin-top: 1rem; padding: 2rem; text-align: center;">
+      <div id="upgrade-cta" class="card" style="margin-top: 1rem; padding: 2rem; text-align: center; display: none;">
+        <p style="color: var(--gray); margin-bottom: 0.5rem;">Assine o plano para desbloquear o Painel Financeiro, Meus Anuncios, Performance e Concorrentes.</p>
+        <button id="btn-assinar" class="btn" style="margin-top: 1rem;">Assinar agora</button>
+      </div>
+
+      <div id="ml-cta" class="card" style="margin-top: 1rem; padding: 2rem; text-align: center;">
         <p style="color: var(--gray); margin-bottom: 0.5rem;">Conecte sua conta do Mercado Livre para acessar todas as funcoes.</p>
-        <p style="font-size: 0.9rem; color: var(--gray-light);">(Login e integracao em breve)</p>
+        <p style="font-size: 0.9rem; color: var(--gray-light);">(Integracao em breve)</p>
       </div>
     </main>
   </div>
 
   <script src="clerk-auth.js"></script>
   <script>
-    initClerkAuth({
-      signInContainerId: 'clerk-signin',
-      userButtonContainerId: 'clerk-user-button',
-      appContentId: 'app-content',
-    });
+    const API_BASE = window.location.origin;
+
+    async function assinarPlano() {
+      const btn = document.getElementById('btn-assinar');
+      btn.disabled = true;
+      btn.textContent = 'Redirecionando…';
+      try {
+        const res = await authFetch(API_BASE + '/api/create-checkout-session', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.url) {
+          window.location.href = data.url;
+          return;
+        }
+        alert(data.detail || 'Erro ao iniciar assinatura.');
+      } catch (e) {
+        alert('Erro: ' + (e.message || 'Não foi possível conectar.'));
+      }
+      btn.disabled = false;
+      btn.textContent = 'Assinar agora';
+    }
+
+    async function applyUserState(me) {
+      const isPaid = me.plan === 'active';
+      const isAdmin = me.isAdmin === true;
+
+      if (isAdmin) {
+        document.getElementById('admin-link-wrap').style.display = 'block';
+      }
+
+      document.querySelectorAll('[data-paid]').forEach(el => {
+        if (isPaid || isAdmin) {
+          el.classList.remove('locked');
+          if (el.tagName === 'A') el.removeAttribute('aria-disabled');
+        } else {
+          el.classList.add('locked');
+          if (el.tagName === 'A') {
+            el.setAttribute('aria-disabled', 'true');
+            el.addEventListener('click', (e) => e.preventDefault());
+            el.href = '#';
+            el.style.opacity = '0.6';
+            el.style.pointerEvents = 'none';
+          }
+        }
+      });
+
+      if (!isPaid && !isAdmin) {
+        document.getElementById('upgrade-cta').style.display = 'block';
+        document.getElementById('btn-assinar').onclick = assinarPlano;
+      }
+    }
+
+    async function init() {
+      await initClerkAuth({
+        signInContainerId: 'clerk-signin',
+        userButtonContainerId: 'clerk-user-button',
+        appContentId: 'app-content',
+      });
+      if (!window.ClerkAuth?.signedIn) return;
+
+      try {
+        const res = await authFetch(API_BASE + '/api/me');
+        const me = await res.json();
+        applyUserState(me);
+      } catch (e) {
+        console.warn('Erro ao carregar /api/me:', e);
+      }
+    }
+
+    init();
   </script>
 </body>
 </html>

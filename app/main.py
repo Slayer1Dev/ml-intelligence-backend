@@ -1,13 +1,13 @@
 # app/main.py
 import os
-from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException, Form, Depends
+from fastapi import FastAPI, Request, UploadFile, File, BackgroundTasks, HTTPException, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import PlainTextResponse, JSONResponse, RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
-from app.auth import clerk_auth_guard, get_clerk_config
+from app.auth import admin_guard, clerk_auth_guard, get_clerk_config, get_current_user, is_admin
 
 import logging
 import uuid
@@ -65,13 +65,20 @@ app.add_middleware(
 # Import dos serviços (suas funções)
 # ------------------------------------------------------------------
 # *Se der ImportError, colocar os módulos no PYTHONPATH ou ajustar import relativo*
-from app.database import init_db
+from app.database import SessionLocal, init_db
+from app.models import Subscription, User
 from app.services.sheets_reader import read_sheet
 from app.services.normalizer import normalize_concorrentes
 from app.services.ai_agent import analyze_market, analyze_uploaded_sheet
 from app.services.prompts import market_prompt
 from app.services.llm_service import run_market_analysis
 from app.services.sheet_processor import process_sheet
+from app.services.stripe_service import (
+    create_checkout_session,
+    handle_checkout_completed,
+    handle_subscription_deleted,
+    handle_subscription_updated,
+)
 
 # ------------------------------------------------------------------
 # STORE de jobs (em memória)
@@ -98,6 +105,19 @@ def process_job(job_id: str, file_path: str):
     except Exception as e:
         JOB_STORE[job_id] = {"status": "error", "error": str(e)}
         logger.exception(f"Job {job_id} - falhou: {e}")
+
+# ------------------------------------------------------------------
+# Guards (dependências para rotas)
+# ------------------------------------------------------------------
+def paid_guard(user: User = Depends(get_current_user)):
+    """Garante que o usuário tem plano pago ou é admin."""
+    if user.plan == "active" or is_admin(user.email):
+        return user
+    raise HTTPException(
+        status_code=403,
+        detail="Recurso restrito a assinantes. Assine o plano para acessar.",
+    )
+
 
 # ------------------------------------------------------------------
 # Schemas (Pydantic)
@@ -220,10 +240,20 @@ def clerk_config():
     return get_clerk_config()
 
 
+@app.get("/api/me")
+def get_me(user: User = Depends(get_current_user)):
+    """Retorna dados do usuário logado (plan, email, isAdmin)."""
+    return {
+        "plan": user.plan,
+        "email": user.email,
+        "isAdmin": is_admin(user.email),
+    }
+
+
 @app.post("/api/calculate-profit")
 def calculate_profit_endpoint(
     data: ProfitInput,
-    _auth=Depends(clerk_auth_guard),
+    user: User = Depends(get_current_user),
 ):
     """Calcula lucro e margem a partir de custo, preço e despesas."""
     taxa = data.preco_venda * (data.taxa_percentual / 100)
@@ -243,7 +273,7 @@ async def financial_dashboard(
     costs_file: Optional[UploadFile] = File(None),
     embalagem: float = Form(1.0),
     frete: float = Form(0.0),
-    _auth=Depends(clerk_auth_guard),
+    user: User = Depends(paid_guard),
 ):
     """Gera indicadores financeiros a partir da planilha do ML e custos opcionais."""
     if not file or not file.filename:
@@ -344,7 +374,7 @@ def market_analysis_ai():
 async def upload_planilha(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    _auth=Depends(clerk_auth_guard),
+    user: User = Depends(paid_guard),
 ):
     """Recebe arquivo, grava temporário e dispara processamento em background (retorna job_id)."""
     if not file or not file.filename:
@@ -375,21 +405,117 @@ async def upload_planilha(
 
 
 @app.get("/jobs")
-def list_jobs(_auth=Depends(clerk_auth_guard)):
+def list_jobs(user: User = Depends(paid_guard)):
     """Retorna todos os jobs (id -> status)."""
     return JOB_STORE
 
 
 @app.get("/jobs/{job_id}")
-def get_job(job_id: str, _auth=Depends(clerk_auth_guard)):
+def get_job(job_id: str, user: User = Depends(paid_guard)):
     job = JOB_STORE.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="job não encontrado")
     return job
 
 
-@app.get("/logs")
-def get_logs():
+@app.get("/api/admin/users")
+def admin_users(admin_user: User = Depends(admin_guard)):
+    """Lista todos os usuários (admin)."""
+    db = SessionLocal()
+    try:
+        users = db.query(User).order_by(User.created_at.desc()).all()
+        return [
+            {
+                "id": u.id,
+                "email": u.email,
+                "clerk_user_id": u.clerk_user_id,
+                "plan": u.plan,
+                "created_at": u.created_at.isoformat() if u.created_at else None,
+            }
+            for u in users
+        ]
+    finally:
+        db.close()
+
+
+@app.get("/api/admin/subscriptions")
+def admin_subscriptions(admin_user: User = Depends(admin_guard)):
+    """Lista assinaturas (admin)."""
+    db = SessionLocal()
+    try:
+        subs = (
+            db.query(Subscription)
+            .join(User)
+            .order_by(Subscription.created_at.desc())
+            .all()
+        )
+        return [
+            {
+                "id": s.id,
+                "user_id": s.user_id,
+                "user_email": s.user.email if s.user else None,
+                "stripe_subscription_id": s.stripe_subscription_id,
+                "status": s.status,
+                "started_at": s.started_at.isoformat() if s.started_at else None,
+                "ends_at": s.ends_at.isoformat() if s.ends_at else None,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+            }
+            for s in subs
+        ]
+    finally:
+        db.close()
+
+
+@app.post("/api/create-checkout-session")
+def stripe_create_checkout(request: Request, user: User = Depends(get_current_user)):
+    """Cria sessão Stripe Checkout e retorna a URL para redirecionar o usuário."""
+    base_url = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
+    if not base_url:
+        base_url = str(request.base_url).rstrip("/")
+    success_url = f"{base_url}/frontend/dashboard.html?success=1"
+    cancel_url = f"{base_url}/frontend/dashboard.html?canceled=1"
+    url = create_checkout_session(user.clerk_user_id, success_url, cancel_url)
+    if not url:
+        raise HTTPException(
+            status_code=503,
+            detail="Stripe não configurado. Defina STRIPE_SECRET_KEY e STRIPE_PRICE_ID.",
+        )
+    return {"url": url}
+
+
+@app.post("/api/stripe-webhook")
+async def stripe_webhook(request: Request):
+    """Recebe eventos do Stripe (checkout.session.completed, customer.subscription.*)."""
+    import stripe
+    from app.services.stripe_service import STRIPE_WEBHOOK_SECRET
+
+    if not STRIPE_WEBHOOK_SECRET:
+        raise HTTPException(status_code=500, detail="STRIPE_WEBHOOK_SECRET não configurado")
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature", "")
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Payload inválido")
+    except stripe.SignatureVerificationError:
+        raise HTTPException(status_code=400, detail="Assinatura inválida")
+
+    db = SessionLocal()
+    try:
+        if event["type"] == "checkout.session.completed":
+            handle_checkout_completed(event["data"]["object"], db)
+        elif event["type"] == "customer.subscription.deleted":
+            handle_subscription_deleted(event["data"]["object"], db)
+        elif event["type"] == "customer.subscription.updated":
+            handle_subscription_updated(event["data"]["object"], db)
+    finally:
+        db.close()
+    return {"received": True}
+
+
+@app.get("/api/admin/logs")
+def admin_logs(admin_user: User = Depends(admin_guard)):
+    """Retorna logs do backend (admin)."""
     if not LOG_FILE.exists():
         return PlainTextResponse("Arquivo de log ainda não criado.")
     try:
