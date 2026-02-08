@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 import requests
 
@@ -50,6 +50,103 @@ def refresh_access_token(refresh_token: str) -> Optional[dict]:
         "refresh_token": refresh_token,
     }
     resp = requests.post(f"{ML_API}/oauth/token", data=payload, timeout=15)
+    if resp.status_code != 200:
+        return None
+    return resp.json()
+
+
+def get_user_info(access_token: str) -> Optional[dict]:
+    """Busca informações do usuário autenticado."""
+    headers = {"Authorization": f"Bearer {access_token}"}
+    resp = requests.get(f"{ML_API}/users/me", headers=headers, timeout=15)
+    if resp.status_code != 200:
+        return None
+    return resp.json()
+
+
+def get_user_items(access_token: str, user_id: str, status: str = "active", limit: int = 50, offset: int = 0) -> Optional[dict]:
+    """Lista anúncios do usuário.
+    
+    Args:
+        access_token: Token de acesso
+        user_id: ID do usuário (seller_id)
+        status: Status dos anúncios (active, paused, closed, etc)
+        limit: Quantidade de resultados por página (máx 50)
+        offset: Offset para paginação
+    """
+    headers = {"Authorization": f"Bearer {access_token}"}
+    params = {
+        "status": status,
+        "limit": min(limit, 50),
+        "offset": offset,
+    }
+    resp = requests.get(f"{ML_API}/users/{user_id}/items/search", headers=headers, params=params, timeout=15)
+    if resp.status_code != 200:
+        return None
+    return resp.json()
+
+
+def get_item_details(access_token: str, item_id: str) -> Optional[dict]:
+    """Busca detalhes de um anúncio específico."""
+    headers = {"Authorization": f"Bearer {access_token}"}
+    resp = requests.get(f"{ML_API}/items/{item_id}", headers=headers, timeout=15)
+    if resp.status_code != 200:
+        return None
+    return resp.json()
+
+
+def get_item_description(access_token: str, item_id: str) -> Optional[str]:
+    """Busca a descrição de um anúncio."""
+    headers = {"Authorization": f"Bearer {access_token}"}
+    resp = requests.get(f"{ML_API}/items/{item_id}/description", headers=headers, timeout=15)
+    if resp.status_code != 200:
+        return None
+    data = resp.json()
+    return data.get("plain_text", "")
+
+
+def get_orders(access_token: str, seller_id: str, status: Optional[str] = None, limit: int = 50, offset: int = 0) -> Optional[dict]:
+    """Busca pedidos/vendas do vendedor.
+    
+    Args:
+        access_token: Token de acesso
+        seller_id: ID do vendedor
+        status: Status do pedido (paid, confirmed, etc) - opcional
+        limit: Quantidade de resultados por página
+        offset: Offset para paginação
+    """
+    headers = {"Authorization": f"Bearer {access_token}"}
+    params = {
+        "seller": seller_id,
+        "limit": limit,
+        "offset": offset,
+    }
+    if status:
+        params["order.status"] = status
+    
+    resp = requests.get(f"{ML_API}/orders/search", headers=headers, params=params, timeout=15)
+    if resp.status_code != 200:
+        return None
+    return resp.json()
+
+
+def get_order_details(access_token: str, order_id: str) -> Optional[dict]:
+    """Busca detalhes de um pedido específico."""
+    headers = {"Authorization": f"Bearer {access_token}"}
+    resp = requests.get(f"{ML_API}/orders/{order_id}", headers=headers, timeout=15)
+    if resp.status_code != 200:
+        return None
+    return resp.json()
+
+
+def get_multiple_items(access_token: str, item_ids: List[str]) -> Optional[List[dict]]:
+    """Busca múltiplos itens de uma vez (máx 20 por requisição)."""
+    if not item_ids:
+        return []
+    
+    headers = {"Authorization": f"Bearer {access_token}"}
+    ids_str = ",".join(item_ids[:20])  # ML limita a 20 por vez
+    resp = requests.get(f"{ML_API}/items", headers=headers, params={"ids": ids_str}, timeout=15)
     if resp.status_code != 200:
         return None
     return resp.json()

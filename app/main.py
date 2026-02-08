@@ -79,7 +79,17 @@ from app.services.mercado_pago_service import (
     handle_preapproval_updated,
     get_preapproval,
 )
-from app.services.ml_api import exchange_code_for_tokens, get_auth_url
+from app.services.ml_api import (
+    exchange_code_for_tokens,
+    get_auth_url,
+    refresh_access_token,
+    get_user_items,
+    get_item_details,
+    get_item_description,
+    get_orders,
+    get_order_details,
+    get_multiple_items,
+)
 
 # ------------------------------------------------------------------
 # STORE de jobs (em memória)
@@ -327,6 +337,37 @@ def ml_oauth_callback(data: MlOAuthInput, user: User = Depends(get_current_user)
         db.close()
 
 
+def get_valid_ml_token(user: User) -> Optional[MlToken]:
+    """Retorna token válido do ML para o usuário, renovando se necessário."""
+    db = SessionLocal()
+    try:
+        token = db.query(MlToken).filter(MlToken.user_id == user.id).first()
+        if not token:
+            return None
+        
+        # Verifica se o token expirou ou está próximo de expirar (renova com 5min de antecedência)
+        from datetime import datetime, timedelta
+        if token.expires_at and token.expires_at <= datetime.utcnow() + timedelta(minutes=5):
+            # Token expirado ou próximo de expirar - renova
+            new_tokens = refresh_access_token(token.refresh_token)
+            if new_tokens and "access_token" in new_tokens:
+                token.access_token = new_tokens.get("access_token", "")
+                if "refresh_token" in new_tokens:
+                    token.refresh_token = new_tokens.get("refresh_token", "")
+                expires_in = new_tokens.get("expires_in")
+                if expires_in:
+                    token.expires_at = datetime.utcnow() + timedelta(seconds=int(expires_in))
+                db.commit()
+                logger.info(f"Token ML renovado para usuário {user.id}")
+            else:
+                logger.warning(f"Falha ao renovar token ML para usuário {user.id}")
+                return None
+        
+        return token
+    finally:
+        db.close()
+
+
 @app.get("/api/ml-status")
 def ml_status(user: User = Depends(get_current_user)):
     """Retorna se o usuário tem conta ML conectada."""
@@ -336,6 +377,152 @@ def ml_status(user: User = Depends(get_current_user)):
         return {"connected": token is not None, "seller_id": token.seller_id if token else None}
     finally:
         db.close()
+
+
+@app.get("/api/ml/items")
+def ml_items(
+    status: str = "active",
+    limit: int = 50,
+    offset: int = 0,
+    user: User = Depends(paid_guard),
+):
+    """Lista anúncios do usuário conectado ao Mercado Livre."""
+    token = get_valid_ml_token(user)
+    if not token or not token.seller_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Conta do Mercado Livre não conectada. Conecte sua conta primeiro.",
+        )
+    
+    result = get_user_items(token.access_token, token.seller_id, status=status, limit=limit, offset=offset)
+    if result is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Erro ao buscar anúncios do Mercado Livre.",
+        )
+    
+    # Busca detalhes dos itens se houver IDs
+    items_data = []
+    if result.get("results"):
+        item_ids = result["results"][:20]  # Máx 20 por vez
+        items_details = get_multiple_items(token.access_token, item_ids)
+        if items_details:
+            items_data = items_details
+    
+    return {
+        "total": result.get("paging", {}).get("total", 0),
+        "offset": result.get("paging", {}).get("offset", 0),
+        "limit": result.get("paging", {}).get("limit", 50),
+        "items": items_data,
+        "item_ids": result.get("results", []),
+    }
+
+
+@app.get("/api/ml/items/{item_id}")
+def ml_item_details(item_id: str, user: User = Depends(paid_guard)):
+    """Busca detalhes de um anúncio específico."""
+    token = get_valid_ml_token(user)
+    if not token:
+        raise HTTPException(
+            status_code=403,
+            detail="Conta do Mercado Livre não conectada. Conecte sua conta primeiro.",
+        )
+    
+    item = get_item_details(token.access_token, item_id)
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Anúncio não encontrado.",
+        )
+    
+    # Busca descrição também
+    description = get_item_description(token.access_token, item_id)
+    
+    return {
+        "item": item,
+        "description": description,
+    }
+
+
+@app.get("/api/ml/orders")
+def ml_orders(
+    status: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    user: User = Depends(paid_guard),
+):
+    """Lista pedidos/vendas do usuário conectado ao Mercado Livre."""
+    token = get_valid_ml_token(user)
+    if not token or not token.seller_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Conta do Mercado Livre não conectada. Conecte sua conta primeiro.",
+        )
+    
+    result = get_orders(token.access_token, token.seller_id, status=status, limit=limit, offset=offset)
+    if result is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Erro ao buscar pedidos do Mercado Livre.",
+        )
+    
+    return result
+
+
+@app.get("/api/ml/orders/{order_id}")
+def ml_order_details(order_id: str, user: User = Depends(paid_guard)):
+    """Busca detalhes de um pedido específico."""
+    token = get_valid_ml_token(user)
+    if not token:
+        raise HTTPException(
+            status_code=403,
+            detail="Conta do Mercado Livre não conectada. Conecte sua conta primeiro.",
+        )
+    
+    order = get_order_details(token.access_token, order_id)
+    if order is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Pedido não encontrado.",
+        )
+    
+    return order
+
+
+@app.get("/api/ml/metrics")
+def ml_metrics(user: User = Depends(paid_guard)):
+    """Retorna métricas gerais da conta do Mercado Livre."""
+    token = get_valid_ml_token(user)
+    if not token or not token.seller_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Conta do Mercado Livre não conectada. Conecte sua conta primeiro.",
+        )
+    
+    # Busca anúncios ativos
+    active_items = get_user_items(token.access_token, token.seller_id, status="active", limit=50)
+    paused_items = get_user_items(token.access_token, token.seller_id, status="paused", limit=50)
+    closed_items = get_user_items(token.access_token, token.seller_id, status="closed", limit=50)
+    
+    # Busca pedidos pagos recentes
+    paid_orders = get_orders(token.access_token, token.seller_id, status="paid", limit=50)
+    
+    total_active = active_items.get("paging", {}).get("total", 0) if active_items else 0
+    total_paused = paused_items.get("paging", {}).get("total", 0) if paused_items else 0
+    total_closed = closed_items.get("paging", {}).get("total", 0) if closed_items else 0
+    total_orders = paid_orders.get("paging", {}).get("total", 0) if paid_orders else 0
+    
+    return {
+        "items": {
+            "active": total_active,
+            "paused": total_paused,
+            "closed": total_closed,
+            "total": total_active + total_paused + total_closed,
+        },
+        "orders": {
+            "paid": total_orders,
+        },
+    }
 
 
 @app.post("/api/calculate-profit")

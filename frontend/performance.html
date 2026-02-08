@@ -45,17 +45,46 @@
     <main class="app-main">
       <h1>Performance da Conta</h1>
       <p class="subtitle">Analises e graficos sobre vendas, visualizacoes e metricas da sua operacao.</p>
-      <div class="card">
+      
+      <div id="ml-not-connected" class="card" style="display: none;">
         <div class="coming-soon">
-          <h2>Em breve</h2>
+          <h2>Conecte sua conta do Mercado Livre</h2>
           <p>Esta funcao mostrara o desempenho da sua conta apos a integracao com o Mercado Livre.</p>
-          <ul class="feature-list">
-            <li>Graficos de vendas ao longo do tempo</li>
-            <li>Visualizacoes e taxa de conversao</li>
-            <li>Anuncios mais vendidos</li>
-            <li>Posicao nos rankings de busca</li>
-          </ul>
-          <div class="chart-placeholder">📈 Area para graficos</div>
+          <a href="dashboard.html" class="button" style="margin-top: 1rem;">Ir para Dashboard</a>
+        </div>
+      </div>
+
+      <div id="loading" class="card" style="text-align: center; padding: 2rem;">
+        <p>Carregando métricas...</p>
+      </div>
+
+      <div id="metrics-container" style="display: none;">
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+          <div class="card" style="text-align: center;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📦</div>
+            <div style="font-size: 2rem; font-weight: bold; color: var(--primary);" id="metric-active">-</div>
+            <div style="color: var(--gray); font-size: 0.9rem;">Anúncios Ativos</div>
+          </div>
+          <div class="card" style="text-align: center;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">⏸️</div>
+            <div style="font-size: 2rem; font-weight: bold; color: var(--warning);" id="metric-paused">-</div>
+            <div style="color: var(--gray); font-size: 0.9rem;">Anúncios Pausados</div>
+          </div>
+          <div class="card" style="text-align: center;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">✅</div>
+            <div style="font-size: 2rem; font-weight: bold; color: var(--success);" id="metric-closed">-</div>
+            <div style="color: var(--gray); font-size: 0.9rem;">Anúncios Fechados</div>
+          </div>
+          <div class="card" style="text-align: center;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">💰</div>
+            <div style="font-size: 2rem; font-weight: bold; color: var(--primary);" id="metric-orders">-</div>
+            <div style="color: var(--gray); font-size: 0.9rem;">Pedidos Pagos</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 style="margin-top: 0;">Resumo</h2>
+          <div id="summary-content"></div>
         </div>
       </div>
     </main>
@@ -63,6 +92,86 @@
 
   <script src="clerk-auth.js"></script>
   <script src="app-nav.js"></script>
-  <script>initClerkAuth({ signInContainerId: 'clerk-signin', userButtonContainerId: 'clerk-user-button', appContentId: 'app-content' });</script>
+  <script>
+    const API_BASE = window.location.origin;
+
+    async function checkMLConnection() {
+      try {
+        const res = await authFetch(API_BASE + '/api/ml-status');
+        const data = await res.json();
+        return data.connected;
+      } catch (e) {
+        console.error('Erro ao verificar conexão ML:', e);
+        return false;
+      }
+    }
+
+    async function loadMetrics() {
+      const loadingEl = document.getElementById('loading');
+      const containerEl = document.getElementById('metrics-container');
+      const notConnectedEl = document.getElementById('ml-not-connected');
+
+      loadingEl.style.display = 'block';
+      containerEl.style.display = 'none';
+      notConnectedEl.style.display = 'none';
+
+      try {
+        const res = await authFetch(API_BASE + '/api/ml/metrics');
+        
+        if (res.status === 403) {
+          notConnectedEl.style.display = 'block';
+          loadingEl.style.display = 'none';
+          return;
+        }
+
+        if (!res.ok) {
+          throw new Error('Erro ao buscar métricas');
+        }
+
+        const data = await res.json();
+        const items = data.items || {};
+        const orders = data.orders || {};
+
+        document.getElementById('metric-active').textContent = items.active || 0;
+        document.getElementById('metric-paused').textContent = items.paused || 0;
+        document.getElementById('metric-closed').textContent = items.closed || 0;
+        document.getElementById('metric-orders').textContent = orders.paid || 0;
+
+        const summaryEl = document.getElementById('summary-content');
+        summaryEl.innerHTML = `
+          <div style="line-height: 1.8;">
+            <p><strong>Total de Anúncios:</strong> ${items.total || 0}</p>
+            <p><strong>Anúncios Ativos:</strong> ${items.active || 0}</p>
+            <p><strong>Anúncios Pausados:</strong> ${items.paused || 0}</p>
+            <p><strong>Anúncios Fechados:</strong> ${items.closed || 0}</p>
+            <p><strong>Pedidos Pagos:</strong> ${orders.paid || 0}</p>
+          </div>
+        `;
+
+        containerEl.style.display = 'block';
+        loadingEl.style.display = 'none';
+      } catch (e) {
+        console.error('Erro ao carregar métricas:', e);
+        containerEl.innerHTML = '<p style="text-align: center; color: var(--error); padding: 2rem;">Erro ao carregar métricas. Tente novamente.</p>';
+        containerEl.style.display = 'block';
+        loadingEl.style.display = 'none';
+      }
+    }
+
+    async function init() {
+      await initClerkAuth({ signInContainerId: 'clerk-signin', userButtonContainerId: 'clerk-user-button', appContentId: 'app-content' });
+      
+      const connected = await checkMLConnection();
+      if (!connected) {
+        document.getElementById('ml-not-connected').style.display = 'block';
+        document.getElementById('loading').style.display = 'none';
+        return;
+      }
+
+      loadMetrics();
+    }
+
+    init();
+  </script>
 </body>
 </html>
