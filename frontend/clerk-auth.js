@@ -31,7 +31,8 @@
       script.src = `${frontendApi}/npm/@clerk/clerk-js@5/dist/clerk.browser.js`;
       script.type = 'text/javascript';
       script.onload = async () => {
-        await Clerk.load();
+        const dashboardUrl = `${API_BASE}/frontend/dashboard.html`;
+        await Clerk.load({ signInFallbackRedirectUrl: dashboardUrl, signUpFallbackRedirectUrl: dashboardUrl });
         const signedIn = !!Clerk.user;
           window.ClerkAuth = {
             ready: true,
@@ -55,28 +56,48 @@
   window.initClerkAuth = async function (opts = {}) {
     const { signInContainerId = 'clerk-signin', userButtonContainerId = 'clerk-user-button', appContentId = 'app-content' } = opts;
 
-    await initClerk();
+    const signInEl = document.getElementById(signInContainerId);
+    const appContent = document.getElementById(appContentId);
+
+    // Esconde o app até decidir: mostrar SignIn ou dashboard
+    if (appContent) appContent.style.display = 'none';
+    if (signInEl) {
+      signInEl.style.display = 'flex';
+      signInEl.innerHTML = '<p style="margin:auto;color:var(--gray);">Carregando…</p>';
+    }
+
+    try {
+      await initClerk();
+    } catch (err) {
+      console.error('Clerk init error:', err);
+      if (appContent) appContent.style.display = '';
+      if (signInEl) { signInEl.style.display = 'none'; signInEl.innerHTML = ''; }
+      window.ClerkAuth = { ready: true, signedIn: false, authFetch: (u, o) => fetch(u, o), getUserName: () => 'Visitante' };
+      return;
+    }
+
     const auth = window.ClerkAuth;
     if (!auth) return;
 
-    const signInEl = document.getElementById(signInContainerId);
     const userButtonEl = document.getElementById(userButtonContainerId);
-    const appContent = document.getElementById(appContentId);
 
     if (auth.signedIn) {
       if (userButtonEl && auth.clerk) auth.clerk.mountUserButton(userButtonEl);
       if (appContent) appContent.style.display = '';
-      if (signInEl) signInEl.style.display = 'none';
+      if (signInEl) { signInEl.style.display = 'none'; signInEl.innerHTML = ''; }
       const userSpan = document.querySelector('.app-user');
       if (userSpan && auth.getUserName()) userSpan.textContent = `Olá, ${auth.getUserName()}`;
     } else if (auth.clerk) {
-      if (signInEl) auth.clerk.mountSignIn(signInEl);
+      signInEl.innerHTML = ''; // Remove "Carregando..."
+      const dashboardUrl = `${API_BASE}/frontend/dashboard.html`;
+      if (signInEl) auth.clerk.mountSignIn(signInEl, { signInFallbackRedirectUrl: dashboardUrl, signUpFallbackRedirectUrl: dashboardUrl });
+      if (signInEl) signInEl.style.display = 'flex';
       if (appContent) appContent.style.display = 'none';
       if (userButtonEl) userButtonEl.style.display = 'none';
     } else {
       // Clerk não configurado — modo dev, mostra o app
       if (appContent) appContent.style.display = '';
-      if (signInEl) signInEl.style.display = 'none';
+      if (signInEl) { signInEl.style.display = 'none'; signInEl.innerHTML = ''; }
     }
 
     return auth;

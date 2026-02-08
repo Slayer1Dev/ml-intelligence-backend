@@ -44,6 +44,15 @@ _CORS_LIST = [o.strip() for o in _CORS_ORIGINS.split(",") if o.strip()] if _CORS
 
 app = FastAPI(title="ML Intelligence Backend")
 
+
+@app.on_event("startup")
+def startup():
+    try:
+        init_db()
+    except Exception as e:
+        logger.exception(f"Erro ao inicializar banco: {e}")
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_CORS_LIST,
@@ -56,6 +65,7 @@ app.add_middleware(
 # Import dos serviços (suas funções)
 # ------------------------------------------------------------------
 # *Se der ImportError, colocar os módulos no PYTHONPATH ou ajustar import relativo*
+from app.database import init_db
 from app.services.sheets_reader import read_sheet
 from app.services.normalizer import normalize_concorrentes
 from app.services.ai_agent import analyze_market, analyze_uploaded_sheet

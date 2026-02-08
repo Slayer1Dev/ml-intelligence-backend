@@ -1,11 +1,19 @@
 # app/auth.py — Integração Clerk com FastAPI
 import os
-from typing import Optional
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi.security import HTTPBearer
 
-load_dotenv()
+# Carrega .env da raiz do projeto (utf-8-sig evita BOM no Windows)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_encoding = "utf-8-sig"
+for _env_name in (".env", ".env.txt"):  # .env.txt = comum no Windows (extensões ocultas)
+    _env_path = _PROJECT_ROOT / _env_name
+    if _env_path.exists():
+        load_dotenv(dotenv_path=_env_path, encoding=_encoding)
+        if os.getenv("CLERK_PUBLISHABLE_KEY"):
+            break
 
 CLERK_JWKS_URL = os.getenv("CLERK_JWKS_URL")
 CLERK_PUBLISHABLE_KEY = os.getenv("CLERK_PUBLISHABLE_KEY")

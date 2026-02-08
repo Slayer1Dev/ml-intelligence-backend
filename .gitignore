@@ -18,6 +18,9 @@ credentials.json
 logs/
 tmp/
 
+# Banco SQLite
+*.db
+
 # Pandas / cache
 *.csv
 *.xlsx
