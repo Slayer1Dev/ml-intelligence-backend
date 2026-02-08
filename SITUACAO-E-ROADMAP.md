@@ -29,12 +29,14 @@
 | Meus Anúncios | ✅ | Lista todos os status; popup para editar custos; links Ver no ML, Editar no ML |
 | Performance | ✅ | Cards clicáveis, links para anúncios |
 | Concorrentes | ✅ | Busca (com fallback público) + comparar; botões estilizados |
+| IA Assistente | ✅ | Perguntas sobre vendas/ML + gerador de respostas para clientes |
+| Análise por anúncio | ✅ | Importar planilha ANALISE ANUNCIOS (CONTA 1 ML, CONTA 2 ML) — pesquisa, preços, ações propostas |
 | Admin — Métricas | ✅ | Total usuários, plano ativo, assinaturas, contas ML |
 | Admin — Usuários | ✅ | Lista + alterar plano (Pro/Free) |
 | Admin — Assinaturas | ✅ | Início, expira em, status |
 | Admin — Logs | ✅ | Arquivo `logs/backend.log` |
 | Admin — Logs IA | ✅ | Tabela `audit_logs` com falhas de IA |
-| Painel Financeiro | ✅ | API ML + custos por anúncio + Insights de IA + gráfico adaptável |
+| Painel Financeiro | ✅ | API ML + custos + Insights IA (crítico: vendas, preço vs mercado) + gráfico + análise por anúncio |
 | Calculadora de Lucro | ✅ | Funcional |
 | Plano de pagamento filtrado | ✅ | Não aparece como produto |
 | Anúncios inativos | ✅ | Status `under_review` incluído |
@@ -43,14 +45,14 @@
 
 ## 3. Pendências e próximos passos
 
-### Prioridade alta
+### Prioridade alta — concluído ✅
 
-1. **Campo de perguntas + resposta IA** — Página ou modal onde o usuário pergunta algo e recebe resposta gerada por IA (ex: dúvidas sobre vendas, estratégia).
-2. **Prompts para responder clientes** — Templates ou gerador de respostas prontas para mensagens de clientes no ML.
+1. ~~**Campo de perguntas + resposta IA**~~ — Página IA Assistente: usuário pergunta e recebe resposta gerada por IA.
+2. ~~**Prompts para responder clientes**~~ — Gerador de respostas por situação (pedido atrasado, dúvida, reclamação, etc.) com contexto opcional.
 
 ### Prioridade média
 
-3. **Busca/Concorrentes** — Se ainda falhar: verificar certificação do app no painel ML Developers.
+3. **Busca** — Agora usa busca pública (sem token) primeiro; token gera 403 em apps não certificados.
 4. **Logs de IA** — Expandir para registrar também sucessos (opcional) e outros eventos.
 5. **Performance** — Melhorar layout e resumo conforme feedback.
 
@@ -69,6 +71,9 @@
 - `GET /api/admin/metrics` — Métricas do sistema
 - `PATCH /api/admin/users/{id}/plan` — Alterar plano do usuário
 - `GET /api/admin/audit-logs` — Logs de auditoria (falhas IA)
+- `POST /api/ia/perguntas` — Responde perguntas do vendedor (body: `{ pergunta }`)
+- `POST /api/ia/resposta-cliente` — Gera sugestão de resposta (body: `{ tipo, contexto?, mensagem_cliente? }`)
+- `POST /api/analise-anuncios` — Importa planilha ANALISE ANUNCIOS e retorna análise por anúncio
 
 ### Novos modelos
 

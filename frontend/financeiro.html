@@ -60,6 +60,7 @@
         <a href="anuncios.html">Meus Anúncios</a>
         <a href="performance.html">Performance</a>
         <a href="concorrentes.html">Concorrentes</a>
+        <a href="ia-assistente.html">IA Assistente</a>
         <span id="admin-link-wrap" style="display:none;"><hr style="margin: 0.5rem 0; border-color: var(--gray-light);"><a href="admin.html">⚙️ Admin</a></span>
       </nav>
     </aside>
@@ -71,6 +72,7 @@
       <div class="tab-row">
         <button type="button" class="tab-btn active" data-tab="ml">Do Mercado Livre (API)</button>
         <button type="button" class="tab-btn" data-tab="planilha">Importar planilha</button>
+        <button type="button" class="tab-btn" data-tab="analise">Análise por anúncio</button>
       </div>
 
       <!-- Modo ML -->
@@ -85,6 +87,31 @@
               <button type="button" id="btn-ai-insights" class="btn-primary-actions btn-insights">✨ Insights de IA</button>
               <span id="last-update" style="color: var(--gray); font-size: 0.9rem;"></span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Análise por anúncio (ANALISE ANUNCIOS) -->
+      <div id="tab-analise" class="tab-content" style="display: none;">
+        <div class="card">
+          <h3 style="margin-bottom: 1rem; color: var(--blue-primary);">Análise por anúncio</h3>
+          <p style="color: var(--gray); margin-bottom: 1rem;">Importe sua planilha ANALISE ANUNCIOS (formato CONTA 1 ML, CONTA 2 ML) com pesquisa de mercado, preços, vendas e ações propostas.</p>
+          <input type="file" id="analiseFile" accept=".xlsx,.xls" style="margin-bottom: 1rem;">
+          <button type="button" id="btn-load-analise" class="btn-primary-actions">Carregar análise</button>
+        </div>
+        <div id="analise-results" class="card" style="margin-top: 1rem; display: none;">
+          <h3 style="margin-bottom: 1rem; color: var(--blue-primary);">Resultados da análise</h3>
+          <div class="table-wrap" style="overflow-x: auto;">
+            <table class="table" id="analise-table">
+              <thead>
+                <tr>
+                  <th>SKU</th><th>Descrição</th><th>Custo</th><th>Preço médio</th><th>Margem %</th><th>Lucro</th>
+                  <th>Preço mais barato</th><th>Preço mais caro</th><th>Preço atual</th>
+                  <th>Valor mais vendido</th><th>Vendas mês</th><th>OBS</th><th>Ações propostas</th><th>Atenção</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -359,6 +386,45 @@
         document.getElementById('tab-' + tab).style.display = 'block';
         if (tab === 'ml') loadFromML();
       });
+    });
+
+    document.getElementById('btn-load-analise')?.addEventListener('click', async () => {
+      const file = document.getElementById('analiseFile').files[0];
+      if (!file) { alert('Selecione um arquivo XLSX.'); return; }
+      const btn = document.getElementById('btn-load-analise');
+      btn.disabled = true;
+      try {
+        const form = new FormData();
+        form.append('file', file);
+        const res = await authFetch(`${API_URL}/api/analise-anuncios`, { method: 'POST', body: form });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Erro');
+        const items = data.items || [];
+        const tbody = document.querySelector('#analise-table tbody');
+        tbody.innerHTML = items.map(it => `
+          <tr>
+            <td>${it.sku || '-'}</td>
+            <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;">${(it.descricao || '-').substring(0, 40)}</td>
+            <td>${it.custo != null ? 'R$ ' + fmt(it.custo) : '-'}</td>
+            <td>${it.preco_medio != null ? 'R$ ' + fmt(it.preco_medio) : '-'}</td>
+            <td>${it.margem_pct != null ? fmt(it.margem_pct) + '%' : '-'}</td>
+            <td>${it.lucro != null ? 'R$ ' + fmt(it.lucro) : '-'}</td>
+            <td>${it.preco_mais_barato != null ? 'R$ ' + fmt(it.preco_mais_barato) : '-'}</td>
+            <td>${it.preco_mais_caro != null ? 'R$ ' + fmt(it.preco_mais_caro) : '-'}</td>
+            <td>${it.preco_atual != null ? 'R$ ' + fmt(it.preco_atual) : '-'}</td>
+            <td style="max-width:100px;">${(String(it.valor_mais_vendido || '-')).substring(0, 30)}</td>
+            <td>${it.vendas_mes || '-'}</td>
+            <td style="max-width:120px;">${(String(it.obs || '-')).substring(0, 40)}</td>
+            <td style="max-width:120px;">${(String(it.acoes_propostas || '-')).substring(0, 40)}</td>
+            <td>${it.atencao || '-'}</td>
+          </tr>
+        `).join('');
+        document.getElementById('analise-results').style.display = 'block';
+      } catch (e) {
+        alert(e.message || 'Erro ao carregar.');
+      } finally {
+        btn.disabled = false;
+      }
     });
 
     document.getElementById('financeForm')?.addEventListener('submit', async (e) => {

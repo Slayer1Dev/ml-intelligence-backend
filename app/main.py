@@ -156,6 +156,16 @@ class ItemCostsBatch(BaseModel):
     items: List[ItemCostUpdate]
 
 
+class IAPerguntaInput(BaseModel):
+    pergunta: str
+
+
+class IARespostaClienteInput(BaseModel):
+    tipo: str  # pedido_atrasado | duvida_produto | reclamacao | agradecimento | orcamento | outro
+    contexto: Optional[str] = None
+    mensagem_cliente: Optional[str] = None
+
+
 # ------------------------------------------------------------------
 # Helpers - Painel financeiro
 # ------------------------------------------------------------------
@@ -216,6 +226,95 @@ def _is_subscription_plan(item: dict) -> bool:
     title = (item.get("title") or "").lower()
     exclude = ("plano pro", "plano mensal", "assinatura", "plano anual")
     return any(x in title for x in exclude)
+
+
+def _find_col(df: pd.DataFrame, *aliases: str) -> Optional[str]:
+    """Encontra coluna por alias (case-insensitive, sem acentos)."""
+    cols_lower = {str(c).lower().replace("á", "a").replace("ã", "a").replace("ç", "c"): c for c in df.columns}
+    for a in aliases:
+        key = a.lower().replace(" ", "").replace(".", "")
+        for k, v in cols_lower.items():
+            if key in k.replace(" ", "").replace(".", ""):
+                return v
+    return None
+
+
+def _parse_analise_anuncios(file_bytes: bytes) -> List[Dict[str, Any]]:
+    """Parse planilha ANALISE ANUNCIOS (formato CONTA 1 ML, CONTA 2 ML). Retorna lista de anúncios com análise."""
+    xl = pd.ExcelFile(io.BytesIO(file_bytes))
+    sheets_ml = [s for s in xl.sheet_names if "ML" in s.upper() and "SHOPEE" not in s.upper()]
+    if not sheets_ml:
+        raise ValueError("Planilha deve ter abas CONTA 1 ML ou CONTA 2 ML.")
+    rows = []
+    for sheet in sheets_ml:
+        df = xl.parse(sheet)
+        df = df.dropna(how="all")
+        if df.empty:
+            continue
+        sku_col = _find_col(df, "COD. DO PROD.", "SKU", "COD DO PROD") or df.columns[0]
+        desc_col = _find_col(df, "Descrição", "DESCRIÇÃO", "Descricao") or df.columns[1]
+        custo_col = _find_col(df, "Valor Unit.", "VALOR UNIT", "Custo")
+        precmed_col = _find_col(df, "Preço de venda médio", "PREÇO MÉDIO", "PRECO MEDIO")
+        margem_col = _find_col(df, "Margem Atual", "MARGEM ATUAL")  # deve vir antes de atual
+        lucro_col = _find_col(df, "LUCRO EM R$", "LUCRO")
+        preco_min_col = _find_col(df, "PREÇO MAIS BARATO", "PRECO MAIS BARATO")
+        preco_max_col = _find_col(df, "PREÇO MAIS CARO", "PRECO MAIS CARO")
+        # ATUAL = preço atual (não confundir com Margem Atual)
+        atual_col = None
+        for c in df.columns:
+            cn = str(c).strip().upper().replace("Á", "A").replace("Ã", "A")
+            if "MARGEM" in cn:
+                continue
+            if cn == "ATUAL" or cn == "VALOR ATUAL" or cn.replace(" ", "") == "VALORATUAL":
+                atual_col = c
+                break
+        mais_vendido_col = _find_col(df, "Valor do mais vendido", "VALOR DO MAIS VENDIDO")
+        vendas_mes_col = _find_col(df, "VENDAS NO MÊS", "VENDAS NO MES")
+        obs_col = _find_col(df, "OBS", "OBS.")
+        acoes_col = _find_col(df, "AÇÕES PROPOSTAS", "ACOES PROPOSTAS")
+        atencao_col = _find_col(df, "ATENÇÃO", "ATENCAO")
+        for _, r in df.iterrows():
+            sku = str(r.get(sku_col, "")).strip()
+            if not sku or sku.lower() == "nan":
+                continue
+            desc = str(r.get(desc_col, "")).strip()[:100] if desc_col and desc_col in r else ""
+            custo = _parse_currency(r.get(custo_col)) if custo_col and custo_col in r else None
+            precmed = _parse_currency(r.get(precmed_col)) if precmed_col and precmed_col in r else None
+            margem_raw = r.get(margem_col) if margem_col and margem_col in r else None
+            margem = None
+            if margem_raw is not None and not (isinstance(margem_raw, float) and pd.isna(margem_raw)):
+                try:
+                    v = float(str(margem_raw).replace(",", "."))
+                    margem = v if v > 1 else v * 100  # se < 1 assume ratio (0.12 -> 12%)
+                except Exception:
+                    pass
+            lucro = _parse_currency(r.get(lucro_col)) if lucro_col and lucro_col in r else None
+            preco_min = _parse_currency(r.get(preco_min_col)) if preco_min_col and preco_min_col in r else None
+            preco_max = _parse_currency(r.get(preco_max_col)) if preco_max_col and preco_max_col in r else None
+            atual = _parse_currency(r.get(atual_col)) if atual_col and atual_col in r else None
+            mais_vendido = str(r.get(mais_vendido_col, "")).strip() if mais_vendido_col and mais_vendido_col in r else None
+            vendas_mes = str(r.get(vendas_mes_col, "")).strip() if vendas_mes_col and vendas_mes_col in r else None
+            obs = str(r.get(obs_col, "")).strip() if obs_col and obs_col in r else None
+            acoes = str(r.get(acoes_col, "")).strip() if acoes_col and acoes_col in r else None
+            atencao = str(r.get(atencao_col, "")).strip() if atencao_col and atencao_col in r else None
+            rows.append({
+                "sku": sku,
+                "descricao": desc,
+                "custo": custo if custo is not None and not pd.isna(custo) else None,
+                "preco_medio": precmed if precmed is not None and not pd.isna(precmed) else None,
+                "margem_pct": round(margem, 2) if margem is not None else None,
+                "lucro": lucro if lucro is not None and not pd.isna(lucro) else None,
+                "preco_mais_barato": preco_min if preco_min is not None and not pd.isna(preco_min) else None,
+                "preco_mais_caro": preco_max if preco_max is not None and not pd.isna(preco_max) else None,
+                "preco_atual": atual if atual is not None and not pd.isna(atual) else None,
+                "valor_mais_vendido": mais_vendido,
+                "vendas_mes": vendas_mes,
+                "obs": obs,
+                "acoes_propostas": acoes,
+                "atencao": atencao,
+                "conta": sheet,
+            })
+    return rows
 
 
 def _parse_costs_sheet(file_bytes: bytes, filename: str) -> Dict[str, float]:
@@ -527,18 +626,20 @@ def ml_search(
     sort: Optional[str] = None,
     user: User = Depends(paid_guard),
 ):
-    """Busca no ML — lista concorrentes por termo. Tenta com token; se falhar, tenta busca pública."""
+    """Busca no ML — lista concorrentes por termo. Usa busca pública (sem token) pois token gera 403 em apps não certificados."""
     if not q or len(q.strip()) < 2:
         raise HTTPException(status_code=400, detail="Digite pelo menos 2 caracteres para buscar.")
-    token = get_valid_ml_token(user)
-    access_token = token.access_token if token else None
-    result = search_public(site_id="MLB", q=q.strip(), limit=limit, offset=offset, sort=sort, access_token=access_token)
-    if result is None and access_token:
-        result = search_public(site_id="MLB", q=q.strip(), limit=limit, offset=offset, sort=sort, access_token=None)
+    # Prioriza busca SEM token: API ML retorna 403 com token em apps não certificados
+    result = search_public(site_id="MLB", q=q.strip(), limit=limit, offset=offset, sort=sort, access_token=None)
+    if result is None:
+        token = get_valid_ml_token(user)
+        access_token = token.access_token if token else None
+        if access_token:
+            result = search_public(site_id="MLB", q=q.strip(), limit=limit, offset=offset, sort=sort, access_token=access_token)
     if result is None:
         raise HTTPException(
             status_code=503,
-            detail="Busca indisponível. Tente reconectar sua conta no dashboard ou verifique a conexão.",
+            detail="Busca indisponível. Verifique sua conexão ou tente novamente em instantes.",
         )
     return result
 
@@ -564,10 +665,10 @@ def ml_compare(
     if not search_term or len(search_term) < 2:
         raise HTTPException(status_code=400, detail="Não foi possível definir termo de busca para este anúncio.")
     
-    # Busca até 50 resultados para encontrar a posição do usuário
-    result = search_public(site_id="MLB", q=search_term[:80], limit=50, offset=0, access_token=token.access_token)
+    # Busca pública primeiro (token gera 403 em apps não certificados)
+    result = search_public(site_id="MLB", q=search_term[:80], limit=50, offset=0, access_token=None)
     if result is None:
-        result = search_public(site_id="MLB", q=search_term[:80], limit=50, offset=0, access_token=None)
+        result = search_public(site_id="MLB", q=search_term[:80], limit=50, offset=0, access_token=token.access_token)
     if result is None:
         raise HTTPException(
             status_code=503,
@@ -753,13 +854,41 @@ def financial_ai_insights(user: User = Depends(paid_guard)):
     panel = _compute_financial_panel(user)
     items = panel.get("items", [])
     metrics = panel.get("metrics", {})
-    prompt = f"""Analise os dados financeiros de um vendedor do Mercado Livre e retorne um JSON com:
-- "resumo": string curta (1-2 frases) sobre a saúde financeira geral
-- "alertas": lista de strings com problemas (ex: muitos itens sem custo, margem baixa)
-- "sugestoes": lista de strings com recomendações de melhoria
-- "top_oportunidades": lista de até 3 strings com as maiores oportunidades
+    # Monta resumo por item: preço, margem, vendidos (CRÍTICO para avaliar competitividade)
+    items_summary = []
+    for it in items[:15]:
+        titulo = (it.get("title") or "")[:50]
+        preco = it.get("price", 0)
+        margem = it.get("margin_pct")
+        vendidos = it.get("sold_quantity", 0)
+        lucro = it.get("profit")
+        items_summary.append(f"  - {titulo}... | preço R$ {preco:.2f} | margem {margem}% | vendidos: {vendidos} | lucro R$ {lucro}")
+    items_text = "\n".join(items_summary) if items_summary else "(nenhum item)"
+    total_vendidos = sum(i.get("sold_quantity", 0) or 0 for i in items)
+    prompt = f"""Você é um consultor de vendas do Mercado Livre. Analise os dados de forma CRÍTICA e REALISTA.
 
-Dados: {len(items)} anúncios, lucro total R$ {metrics.get('profit_total', 0)}, margem média {metrics.get('margin_mean', 0)}%, {metrics.get('missing_cost', 0)} itens sem custo cadastrado.
+REGRAS IMPORTANTES:
+- Margem alta com ZERO vendas indica PREÇO ACIMA DO MERCADO — o vendedor provavelmente está mais caro que concorrentes.
+- Lucro positivo sem vendas não é "saúde financeira excelente" — é apenas potencial teórico.
+- Sugira ações CONCRETAS: revisar preço vs concorrentes, promoções, estoque, anúncio inativo, etc.
+- Evite sugestões genéricas como "manter margem" ou "expandir anúncios" se não houver vendas.
+
+DADOS:
+- Total de anúncios: {len(items)}
+- Lucro total: R$ {metrics.get('profit_total', 0)}
+- Margem média: {metrics.get('margin_mean', 0)}%
+- Total de VENDAS (sold_quantity): {total_vendidos}
+- Itens sem custo cadastrado: {metrics.get('missing_cost', 0)}
+
+DETALHAMENTO POR ANÚNCIO (preço, margem, vendidos, lucro):
+{items_text}
+
+Retorne um JSON com:
+- "resumo": análise curta e CRÍTICA (ex: "Margem boa, mas zero vendas sugere preço elevado. Compare com concorrentes.")
+- "alertas": problemas reais (ex: "Anúncios com margem alta e 0 vendas — provável preço acima do mercado")
+- "sugestoes": ações CONCRETAS (ex: "Pesquise preços de concorrentes e ajuste oferta", "Considere promoção para testar demanda")
+- "top_oportunidades": até 3 oportunidades REAIS baseadas nos dados
+
 Retorne APENAS o JSON, sem markdown."""
     try:
         out = run_market_analysis(prompt)
@@ -767,6 +896,69 @@ Retorne APENAS o JSON, sem markdown."""
     except Exception as e:
         _log_ia_failure(user.id, "ia_insights_fail", str(e)[:512], f"user_id={user.id}")
         logger.exception("Erro ao gerar insights IA: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ------------------------------------------------------------------
+# IA Assistente: perguntas e respostas para clientes
+# ------------------------------------------------------------------
+@app.post("/api/ia/perguntas")
+def ia_perguntas(data: IAPerguntaInput, user: User = Depends(paid_guard)):
+    """Responde perguntas do vendedor sobre vendas, estratégia, Mercado Livre, etc."""
+    pergunta = (data.pergunta or "").strip()
+    if not pergunta or len(pergunta) < 5:
+        raise HTTPException(status_code=400, detail="Digite uma pergunta com pelo menos 5 caracteres.")
+    if len(pergunta) > 2000:
+        raise HTTPException(status_code=400, detail="Pergunta muito longa. Resuma em até 2000 caracteres.")
+    try:
+        from app.services.llm_service import run_chat
+    except Exception:
+        raise HTTPException(status_code=503, detail="IA não configurada. Defina OPENAI_API_KEY.")
+    system = "Você é um assistente especializado em vendas no Mercado Livre. Responda de forma clara e objetiva, em português."
+    try:
+        resposta = run_chat(pergunta, system_hint=system)
+        return {"resposta": resposta}
+    except Exception as e:
+        _log_ia_failure(user.id, "ia_perguntas_fail", str(e)[:512], f"user_id={user.id}")
+        logger.exception("Erro IA perguntas: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+_RESPOSTA_TIPOS = {
+    "pedido_atrasado": "O cliente está perguntando sobre atraso no envio ou entrega do pedido.",
+    "duvida_produto": "O cliente tem dúvida sobre características, especificações ou uso do produto.",
+    "reclamacao": "O cliente está reclamando de algo (produto, prazo, atendimento).",
+    "agradecimento": "O cliente agradeceu pela compra ou pelo atendimento.",
+    "orcamento": "O cliente pediu orçamento ou informação sobre preços.",
+    "outro": "Outra situação de atendimento ao cliente.",
+}
+
+
+@app.post("/api/ia/resposta-cliente")
+def ia_resposta_cliente(data: IARespostaClienteInput, user: User = Depends(paid_guard)):
+    """Gera sugestão de resposta profissional para mensagem de cliente no Mercado Livre."""
+    tipo = (data.tipo or "outro").strip()
+    contexto = (data.contexto or "").strip()
+    msg = (data.mensagem_cliente or "").strip()
+    tipo_desc = _RESPOSTA_TIPOS.get(tipo, _RESPOSTA_TIPOS["outro"])
+    try:
+        from app.services.llm_service import run_chat
+    except Exception:
+        raise HTTPException(status_code=503, detail="IA não configurada. Defina OPENAI_API_KEY.")
+    prompt_parts = [f"Situação: {tipo_desc}"]
+    if contexto:
+        prompt_parts.append(f"Contexto adicional: {contexto}")
+    if msg:
+        prompt_parts.append(f"Mensagem do cliente: {msg}")
+    prompt_parts.append("\nGere uma resposta profissional, cordial e concisa para o vendedor enviar ao cliente no Mercado Livre. Use tom adequado e evite jargões. Responda em português.")
+    prompt = "\n".join(prompt_parts)
+    system = "Você é um assistente que ajuda vendedores do Mercado Livre a redigir respostas para clientes. Seja cordial, profissional e objetivo."
+    try:
+        resposta = run_chat(prompt, system_hint=system)
+        return {"resposta": resposta}
+    except Exception as e:
+        _log_ia_failure(user.id, "ia_resposta_cliente_fail", str(e)[:512], f"user_id={user.id}")
+        logger.exception("Erro IA resposta cliente: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -846,6 +1038,22 @@ async def financial_dashboard(
         },
         "top_profit": top_profit,
     }
+
+
+@app.post("/api/analise-anuncios")
+async def analise_anuncios(file: UploadFile = File(...), user: User = Depends(paid_guard)):
+    """Importa planilha ANALISE ANUNCIOS (formato CONTA 1 ML, CONTA 2 ML) e retorna análise por anúncio."""
+    if not file or not file.filename or not file.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Envie um arquivo XLSX (planilha ANALISE ANUNCIOS).")
+    try:
+        data = await file.read()
+        items = _parse_analise_anuncios(data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Erro ao parsear planilha analise: %s", e)
+        raise HTTPException(status_code=400, detail=f"Erro ao ler planilha: {e}")
+    return {"items": items, "total": len(items)}
 
 
 @app.get("/sheets/test")

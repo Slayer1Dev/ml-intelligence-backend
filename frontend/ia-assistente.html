@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <title>IA Assistente — ML Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+  <style>
+    .ia-section { margin-bottom: 2rem; }
+    .ia-section h2 { margin-bottom: 0.75rem; color: var(--blue-primary); font-size: 1.2rem; }
+    .ia-textarea { width: 100%; min-height: 100px; padding: 0.75rem 1rem; border: 1px solid var(--gray-light); border-radius: 8px; font-family: inherit; font-size: 0.95rem; resize: vertical; }
+    .ia-textarea:focus { outline: none; border-color: var(--blue-primary); }
+    .ia-output { background: #f8fafc; border: 1px solid var(--gray-light); border-radius: 8px; padding: 1rem; margin-top: 1rem; white-space: pre-wrap; min-height: 80px; }
+    .ia-output:empty::before { content: 'A resposta aparecerá aqui...'; color: var(--gray); }
+    .btn-ia { padding: 0.5rem 1.25rem; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; background: var(--blue-primary); color: white; font-size: 0.95rem; }
+    .btn-ia:hover { background: var(--blue-dark); }
+    .btn-ia:disabled { opacity: 0.7; cursor: not-allowed; }
+    .tipo-select { padding: 0.5rem 1rem; border: 1px solid var(--gray-light); border-radius: 8px; font-size: 0.95rem; min-width: 180px; }
+    .ia-row { display: flex; gap: 0.75rem; align-items: flex-start; flex-wrap: wrap; margin-bottom: 0.75rem; }
+    .ia-row label { min-width: 120px; font-weight: 500; }
+  </style>
+</head>
+<body class="app">
+  <header class="app-header">
+    <a href="dashboard.html" class="app-logo">ML Intelligence</a>
+    <span class="app-user">Olá, vendedor</span>
+    <div id="clerk-user-button"></div>
+  </header>
+
+  <div id="clerk-signin" style="display:none;"></div>
+
+  <div id="app-content" class="app-body">
+    <aside class="app-sidebar">
+      <nav>
+        <a href="dashboard.html">Resumo</a>
+        <a href="financeiro.html">Painel Financeiro</a>
+        <a href="calculator.html">Calculadora de Lucro</a>
+        <a href="anuncios.html">Meus Anúncios</a>
+        <a href="performance.html">Performance</a>
+        <a href="concorrentes.html">Concorrentes</a>
+        <a href="ia-assistente.html" class="active">IA Assistente</a>
+        <span id="admin-link-wrap" style="display:none;"><hr style="margin: 0.5rem 0; border-color: var(--gray-light);"><a href="admin.html">⚙️ Admin</a></span>
+      </nav>
+    </aside>
+
+    <main class="app-main">
+      <h1>IA Assistente</h1>
+      <p class="subtitle">Faça perguntas sobre vendas e Mercado Livre, ou gere respostas profissionais para seus clientes.</p>
+
+      <div id="upgrade-required" class="card" style="display: none;">
+        <div class="coming-soon">
+          <h2>Plano Pro necessário</h2>
+          <p>Assine o plano para acessar o Assistente de IA.</p>
+          <a href="dashboard.html" class="button" style="margin-top: 1rem;">Ver planos</a>
+        </div>
+      </div>
+
+      <div id="ia-container" style="display: none;">
+        <!-- Perguntas -->
+        <div class="card ia-section">
+          <h2>💬 Faça uma pergunta</h2>
+          <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 1rem;">Pergunte sobre vendas, estratégia, Mercado Livre, preços, margens, etc.</p>
+          <textarea id="pergunta-input" class="ia-textarea" placeholder="Ex: Como melhorar minhas vendas no Mercado Livre? Ou: Qual margem devo aplicar em produtos eletrônicos?"></textarea>
+          <div style="margin-top: 0.75rem;">
+            <button type="button" id="btn-perguntas" class="btn-ia">Gerar resposta</button>
+          </div>
+          <div id="pergunta-output" class="ia-output"></div>
+        </div>
+
+        <!-- Respostas para clientes -->
+        <div class="card ia-section">
+          <h2>📝 Respostas para clientes</h2>
+          <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 1rem;">Gere sugestões de resposta profissional para mensagens de clientes no Mercado Livre.</p>
+          <div class="ia-row">
+            <label for="tipo-select">Situação:</label>
+            <select id="tipo-select" class="tipo-select">
+              <option value="pedido_atrasado">Pedido atrasado</option>
+              <option value="duvida_produto">Dúvida sobre o produto</option>
+              <option value="reclamacao">Reclamação</option>
+              <option value="agradecimento">Agradecimento</option>
+              <option value="orcamento">Orçamento / Preço</option>
+              <option value="outro">Outra situação</option>
+            </select>
+          </div>
+          <div class="ia-row">
+            <label for="contexto-input">Contexto (opcional):</label>
+            <input type="text" id="contexto-input" style="flex: 1; padding: 0.5rem 1rem; border: 1px solid var(--gray-light); border-radius: 8px; font-size: 0.95rem;" placeholder="Ex: Produto X, atraso de 3 dias no envio">
+          </div>
+          <div class="ia-row">
+            <label for="mensagem-input">Mensagem do cliente (opcional):</label>
+            <textarea id="mensagem-input" class="ia-textarea" style="flex: 1; min-height: 80px;" placeholder="Cole aqui a mensagem que o cliente enviou..."></textarea>
+          </div>
+          <div style="margin-top: 0.75rem;">
+            <button type="button" id="btn-resposta-cliente" class="btn-ia">Gerar resposta sugerida</button>
+          </div>
+          <div id="resposta-cliente-output" class="ia-output"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="clerk-auth.js"></script>
+  <script src="app-nav.js"></script>
+  <script>
+    const API_BASE = window.location.origin;
+
+    async function checkAccess() {
+      try {
+        const res = await authFetch(API_BASE + '/api/me');
+        const me = await res.json();
+        if (me.plan === 'active' || me.isAdmin) {
+          document.getElementById('ia-container').style.display = 'block';
+          document.getElementById('upgrade-required').style.display = 'none';
+          return true;
+        }
+      } catch (e) { console.error(e); }
+      document.getElementById('upgrade-required').style.display = 'block';
+      document.getElementById('ia-container').style.display = 'none';
+      return false;
+    }
+
+    async function perguntar() {
+      const input = document.getElementById('pergunta-input');
+      const output = document.getElementById('pergunta-output');
+      const btn = document.getElementById('btn-perguntas');
+      const pergunta = (input.value || '').trim();
+      if (!pergunta || pergunta.length < 5) {
+        alert('Digite uma pergunta com pelo menos 5 caracteres.');
+        return;
+      }
+      btn.disabled = true;
+      output.textContent = 'Gerando resposta...';
+      try {
+        const res = await authFetch(API_BASE + '/api/ia/perguntas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pergunta })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Erro');
+        output.textContent = data.resposta || '(Sem resposta)';
+      } catch (e) {
+        output.textContent = 'Erro: ' + (e.message || 'Tente novamente.');
+        output.style.color = '#dc2626';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function gerarRespostaCliente() {
+      const tipo = document.getElementById('tipo-select').value;
+      const contexto = document.getElementById('contexto-input').value.trim();
+      const mensagem = document.getElementById('mensagem-input').value.trim();
+      const output = document.getElementById('resposta-cliente-output');
+      const btn = document.getElementById('btn-resposta-cliente');
+      btn.disabled = true;
+      output.textContent = 'Gerando sugestão...';
+      output.style.color = '';
+      try {
+        const res = await authFetch(API_BASE + '/api/ia/resposta-cliente', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tipo, contexto: contexto || undefined, mensagem_cliente: mensagem || undefined })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Erro');
+        output.textContent = data.resposta || '(Sem resposta)';
+      } catch (e) {
+        output.textContent = 'Erro: ' + (e.message || 'Tente novamente.');
+        output.style.color = '#dc2626';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function init() {
+      await initClerkAuth({ signInContainerId: 'clerk-signin', userButtonContainerId: 'clerk-user-button', appContentId: 'app-content' });
+      if (!window.ClerkAuth?.signedIn) return;
+      await checkAccess();
+      document.getElementById('btn-perguntas')?.addEventListener('click', perguntar);
+      document.getElementById('btn-resposta-cliente')?.addEventListener('click', gerarRespostaCliente);
+    }
+    init();
+  </script>
+</body>
+</html>

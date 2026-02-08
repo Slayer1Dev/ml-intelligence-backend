@@ -69,3 +69,26 @@ def run_market_analysis(prompt: str):
     except Exception as e:
         logger.exception("Falha ao converter resposta do LLM para JSON")
         return {"error": "Resposta da IA não é JSON válido", "raw": raw_text}
+
+
+def run_chat(prompt: str, system_hint: str | None = None) -> str:
+    """Envia prompt ao LLM e retorna resposta em texto livre (para perguntas, respostas a clientes)."""
+    logger.info("Enviando prompt ao LLM (chat)")
+    client = _get_client()
+    messages = []
+    if system_hint:
+        messages.append({"role": "system", "content": system_hint})
+    messages.append({"role": "user", "content": prompt})
+
+    try:
+        r = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+        )
+        raw_text = (r.choices[0].message.content or "").strip()
+    except Exception as e:
+        raise RuntimeError(f"LLM indisponível: {e}") from e
+
+    if not raw_text:
+        raise RuntimeError("LLM retornou resposta vazia")
+    return raw_text
