@@ -66,7 +66,7 @@ app.add_middleware(
 # ------------------------------------------------------------------
 # *Se der ImportError, colocar os módulos no PYTHONPATH ou ajustar import relativo*
 from app.database import SessionLocal, init_db
-from app.models import Subscription, User
+from app.models import MlToken, Subscription, User
 from app.services.sheets_reader import read_sheet
 from app.services.normalizer import normalize_concorrentes
 from app.services.ai_agent import analyze_market, analyze_uploaded_sheet
@@ -79,6 +79,7 @@ from app.services.mercado_pago_service import (
     handle_preapproval_updated,
     get_preapproval,
 )
+from app.services.ml_api import exchange_code_for_tokens, get_auth_url
 
 # ------------------------------------------------------------------
 # STORE de jobs (em memória)
@@ -270,6 +271,71 @@ def debug_admin(user: User = Depends(get_current_user)):
             )
         ),
     }
+
+
+@app.get("/api/ml-auth-url")
+def ml_auth_url(user: User = Depends(get_current_user)):
+    """Retorna URL para redirecionar o usuário ao OAuth do Mercado Livre."""
+    url = get_auth_url()
+    if not url:
+        raise HTTPException(
+            status_code=503,
+            detail="Mercado Livre não configurado. Defina ML_APP_ID, ML_SECRET e ML_REDIRECT_URI.",
+        )
+    return {"url": url}
+
+
+class MlOAuthInput(BaseModel):
+    code: str
+
+
+@app.post("/api/ml-oauth-callback")
+def ml_oauth_callback(data: MlOAuthInput, user: User = Depends(get_current_user)):
+    """Recebe o code do OAuth e salva os tokens do Mercado Livre."""
+    if not data.code or not data.code.strip():
+        raise HTTPException(status_code=400, detail="Código OAuth ausente.")
+    tokens = exchange_code_for_tokens(data.code.strip())
+    if not tokens or "access_token" not in tokens:
+        raise HTTPException(status_code=400, detail="Não foi possível obter tokens do Mercado Livre.")
+    access_token = tokens.get("access_token", "")
+    refresh_token = tokens.get("refresh_token", "")
+    expires_in = tokens.get("expires_in")  # segundos
+    seller_id = tokens.get("user_id")
+    expires_at = None
+    if expires_in:
+        from datetime import datetime, timedelta
+        expires_at = datetime.utcnow() + timedelta(seconds=int(expires_in))
+    db = SessionLocal()
+    try:
+        existing = db.query(MlToken).filter(MlToken.user_id == user.id).first()
+        if existing:
+            existing.access_token = access_token
+            existing.refresh_token = refresh_token
+            existing.seller_id = str(seller_id) if seller_id else None
+            existing.expires_at = expires_at
+        else:
+            db.add(MlToken(
+                user_id=user.id,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                seller_id=str(seller_id) if seller_id else None,
+                expires_at=expires_at,
+            ))
+        db.commit()
+        return {"ok": True, "seller_id": seller_id}
+    finally:
+        db.close()
+
+
+@app.get("/api/ml-status")
+def ml_status(user: User = Depends(get_current_user)):
+    """Retorna se o usuário tem conta ML conectada."""
+    db = SessionLocal()
+    try:
+        token = db.query(MlToken).filter(MlToken.user_id == user.id).first()
+        return {"connected": token is not None, "seller_id": token.seller_id if token else None}
+    finally:
+        db.close()
 
 
 @app.post("/api/calculate-profit")

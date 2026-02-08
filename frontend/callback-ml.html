@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conectando Mercado Livre — ML Intelligence</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body class="app">
+  <div id="clerk-signin" style="display:none;"></div>
+  <div id="callback-content" style="max-width: 480px; margin: 4rem auto; padding: 2rem; text-align: center;">
+    <h1 style="margin-bottom: 1rem;">Conectando Mercado Livre…</h1>
+    <p id="status" style="color: var(--gray);">Aguarde.</p>
+    <p id="error" style="color: var(--danger, #c00); display: none;"></p>
+    <a id="link-dashboard" href="dashboard.html" style="display: none; margin-top: 1rem;">Voltar ao dashboard</a>
+  </div>
+
+  <script src="clerk-auth.js"></script>
+  <script>
+    const API_BASE = window.location.origin;
+
+    async function handleCallback() {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const error = params.get('error');
+
+      const statusEl = document.getElementById('status');
+      const errorEl = document.getElementById('error');
+      const linkEl = document.getElementById('link-dashboard');
+
+      if (error) {
+        statusEl.textContent = 'Autorização cancelada ou negada.';
+        errorEl.textContent = error;
+        errorEl.style.display = 'block';
+        linkEl.style.display = 'inline-block';
+        return;
+      }
+
+      if (!code) {
+        statusEl.textContent = 'Nenhum código recebido.';
+        linkEl.style.display = 'inline-block';
+        return;
+      }
+
+      if (!window.ClerkAuth?.signedIn) {
+        statusEl.textContent = 'Faça login e tente novamente.';
+        linkEl.href = 'dashboard.html';
+        linkEl.style.display = 'inline-block';
+        return;
+      }
+
+      try {
+        const authFetch = window.ClerkAuth?.authFetch || fetch;
+        const res = await authFetch(API_BASE + '/api/ml-oauth-callback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          statusEl.textContent = 'Conta conectada com sucesso!';
+          linkEl.href = 'dashboard.html?success=ml';
+          linkEl.style.display = 'inline-block';
+          setTimeout(() => { window.location.href = 'dashboard.html?success=ml'; }, 1500);
+        } else {
+          statusEl.textContent = 'Erro ao conectar.';
+          errorEl.textContent = data.detail || 'Tente novamente.';
+          errorEl.style.display = 'block';
+          linkEl.style.display = 'inline-block';
+        }
+      } catch (e) {
+        statusEl.textContent = 'Erro ao conectar.';
+        errorEl.textContent = e.message || 'Não foi possível conectar.';
+        errorEl.style.display = 'block';
+        linkEl.style.display = 'inline-block';
+      }
+    }
+
+    async function init() {
+      await initClerkAuth({
+        signInContainerId: 'clerk-signin',
+        userButtonContainerId: '',
+        appContentId: 'callback-content',
+      });
+      await handleCallback();
+    }
+
+    init();
+  </script>
+</body>
+</html>

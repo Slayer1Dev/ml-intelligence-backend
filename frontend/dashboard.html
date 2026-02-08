@@ -73,8 +73,9 @@
       </div>
 
       <div id="ml-cta" class="card" style="margin-top: 1rem; padding: 2rem; text-align: center;">
-        <p style="color: var(--gray); margin-bottom: 0.5rem;">Conecte sua conta do Mercado Livre para acessar todas as funcoes.</p>
-        <p style="font-size: 0.9rem; color: var(--gray-light);">(Integracao em breve)</p>
+        <p id="ml-cta-text" style="color: var(--gray); margin-bottom: 0.5rem;">Conecte sua conta do Mercado Livre para acessar todas as funcoes.</p>
+        <button id="btn-conectar-ml" class="btn" style="margin-top: 0.5rem; display: none;">Conectar Mercado Livre</button>
+        <p id="ml-conectado" style="font-size: 0.9rem; color: var(--success, #0a0); display: none;">✓ Conta conectada</p>
       </div>
     </main>
   </div>
@@ -154,6 +155,33 @@
         const res = await authFetch(API_BASE + '/api/me');
         const me = await res.json();
         applyUserState(me);
+
+        const mlRes = await authFetch(API_BASE + '/api/ml-status');
+        const ml = await mlRes.json();
+        const btn = document.getElementById('btn-conectar-ml');
+        const conectado = document.getElementById('ml-conectado');
+        const ctaText = document.getElementById('ml-cta-text');
+        if (ml.connected) {
+          if (btn) btn.style.display = 'none';
+          if (conectado) conectado.style.display = 'block';
+          if (ctaText) ctaText.textContent = 'Sua conta do Mercado Livre está conectada.';
+        } else if (mlRes.ok) {
+          if (btn) {
+            btn.style.display = 'inline-block';
+            btn.onclick = async () => {
+              btn.disabled = true;
+              btn.textContent = 'Redirecionando…';
+              try {
+                const u = await authFetch(API_BASE + '/api/ml-auth-url');
+                const d = await u.json();
+                if (u.ok && d.url) window.location.href = d.url;
+                else alert(d.detail || 'Erro ao obter URL.');
+              } catch (e) { alert('Erro: ' + (e.message || 'Não foi possível conectar.')); }
+              btn.disabled = false;
+              btn.textContent = 'Conectar Mercado Livre';
+            };
+          }
+        }
       } catch (e) {
         console.warn('Erro ao carregar /api/me:', e);
       }

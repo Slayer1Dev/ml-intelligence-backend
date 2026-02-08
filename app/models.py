@@ -17,6 +17,22 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     subscriptions = relationship("Subscription", back_populates="user")
+    ml_token = relationship("MlToken", back_populates="user", uselist=False)
+
+
+class MlToken(Base):
+    """Tokens OAuth do Mercado Livre por usuário."""
+    __tablename__ = "ml_tokens"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    access_token = Column(String(512), nullable=False)
+    refresh_token = Column(String(512), nullable=False)
+    seller_id = Column(String(64), nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="ml_token")
 
 
 class Subscription(Base):
