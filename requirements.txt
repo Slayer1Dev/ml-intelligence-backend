@@ -10,3 +10,4 @@ fastapi-clerk-auth
 sqlalchemy
 gspread
 google-auth
+openai
