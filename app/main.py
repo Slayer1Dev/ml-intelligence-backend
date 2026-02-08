@@ -211,6 +211,13 @@ def _parse_currency(val: Any) -> float:
         return float("nan")
 
 
+def _is_subscription_plan(item: dict) -> bool:
+    """Identifica anúncios que são planos de assinatura (não produtos)."""
+    title = (item.get("title") or "").lower()
+    exclude = ("plano pro", "plano mensal", "assinatura", "plano anual")
+    return any(x in title for x in exclude)
+
+
 def _parse_costs_sheet(file_bytes: bytes, filename: str) -> Dict[str, float]:
     ext = (filename or "").lower()
     if ext.endswith(".csv"):
@@ -416,13 +423,30 @@ def ml_items(
             detail="Erro ao buscar anúncios do Mercado Livre.",
         )
     
-    # Busca detalhes dos itens se houver IDs
+    # Busca detalhes dos itens se houver IDs e custos salvos
     items_data = []
     if result.get("results"):
         item_ids = result["results"][:20]  # Máx 20 por vez
         items_details = get_multiple_items(token.access_token, item_ids)
         if items_details:
-            items_data = items_details
+            items_data = [i for i in items_details if not _is_subscription_plan(i)]
+        # Injeta custos salvos por item
+        if items_data:
+            ids = [i.get("id") for i in items_data if i.get("id")]
+            if ids:
+                db = SessionLocal()
+                try:
+                    costs = {c.item_id: c for c in db.query(ItemCost).filter(ItemCost.user_id == user.id, ItemCost.item_id.in_(ids)).all()}
+                    for it in items_data:
+                        c = costs.get(it.get("id"))
+                        if c:
+                            it["custo_produto"] = c.custo_produto
+                            it["embalagem"] = c.embalagem or 0
+                            it["frete"] = c.frete or 0
+                            it["taxa_pct"] = c.taxa_pct
+                            it["imposto_pct"] = c.imposto_pct
+                finally:
+                    db.close()
     
     return {
         "total": result.get("paging", {}).get("total", 0),
@@ -660,6 +684,7 @@ def _compute_financial_panel(user: User) -> dict:
         return {"metrics": {"total_listings": 0, "profit_total": 0, "margin_mean": 0, "missing_cost": 0}, "items": [], "top_profit": []}
     item_ids = result["results"][:50]
     items_data = get_multiple_items(token.access_token, item_ids) or []
+    items_data = [i for i in items_data if not _is_subscription_plan(i)]
     db = SessionLocal()
     try:
         costs = {c.item_id: c for c in db.query(ItemCost).filter(ItemCost.user_id == user.id).all()}

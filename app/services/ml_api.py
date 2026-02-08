@@ -80,10 +80,10 @@ def get_user_items(access_token: str, user_id: str, status: str = "active", limi
         offset: Offset para paginação
     """
     if status == "all":
-        # Busca active + paused + closed e mescla (inclui "inativo para revisar" em paused)
+        # Busca active + paused + closed + under_review (inclui "inativo para revisar")
         all_results: List[str] = []
         all_paging = {"total": 0, "offset": 0, "limit": limit}
-        for st in ["active", "paused", "closed"]:
+        for st in ["active", "paused", "closed", "under_review"]:
             r = get_user_items(access_token, user_id, status=st, limit=50, offset=0)
             if r and r.get("results"):
                 all_results.extend(r["results"])

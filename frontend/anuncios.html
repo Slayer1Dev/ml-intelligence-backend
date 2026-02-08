@@ -9,6 +9,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css">
+  <style>
+    .anuncio-card:hover { box-shadow: 0 4px 12px rgba(30, 64, 175, 0.15); transition: box-shadow 0.2s; }
+  </style>
 </head>
 <body class="app">
   <header class="app-header">
@@ -56,6 +59,55 @@
         <p>Carregando anúncios...</p>
       </div>
 
+      <div id="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 999; backdrop-filter: blur(2px);" onclick="closeAnuncioModal()"></div>
+      <div id="anuncio-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); max-width: 480px; width: 90%; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation();">
+        <div style="padding: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+            <h2 style="margin: 0; font-size: 1.25rem; color: var(--blue-primary);">Detalhes do anúncio</h2>
+            <button type="button" onclick="closeAnuncioModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--gray); line-height: 1;">&times;</button>
+          </div>
+          <div style="margin-bottom: 1rem;">
+            <p id="modal-title" style="margin: 0 0 0.5rem 0; font-weight: 600;"></p>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; color: var(--gray); font-size: 0.9rem;">
+              <span>ID: <strong id="modal-item-id"></strong></span>
+              <span>Preço: <strong id="modal-price" style="color: var(--primary);"></strong></span>
+              <span>Status: <strong id="modal-status"></strong></span>
+              <span>Vendidos: <strong id="modal-sold"></strong></span>
+              <span>Disponíveis: <strong id="modal-available"></strong></span>
+            </div>
+          </div>
+          <hr style="margin: 1rem 0; border: none; border-top: 1px solid var(--gray-light);">
+          <h3 style="margin: 0 0 0.75rem 0; font-size: 1rem;">Custos e despesas (edite e salve)</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+            <label style="display: flex; flex-direction: column; gap: 0.25rem;">
+              <span style="font-size: 0.9rem; color: var(--gray);">Custo (R$)</span>
+              <input type="text" id="modal-custo" inputmode="decimal" placeholder="0,00" style="padding: 0.5rem; border: 1px solid var(--gray-light); border-radius: 6px;">
+            </label>
+            <label style="display: flex; flex-direction: column; gap: 0.25rem;">
+              <span style="font-size: 0.9rem; color: var(--gray);">Embalagem (R$)</span>
+              <input type="text" id="modal-embalagem" inputmode="decimal" value="0" style="padding: 0.5rem; border: 1px solid var(--gray-light); border-radius: 6px;">
+            </label>
+            <label style="display: flex; flex-direction: column; gap: 0.25rem;">
+              <span style="font-size: 0.9rem; color: var(--gray);">Frete (R$)</span>
+              <input type="text" id="modal-frete" inputmode="decimal" value="0" style="padding: 0.5rem; border: 1px solid var(--gray-light); border-radius: 6px;">
+            </label>
+            <label style="display: flex; flex-direction: column; gap: 0.25rem;">
+              <span style="font-size: 0.9rem; color: var(--gray);">Taxa (%)</span>
+              <input type="text" id="modal-taxa" inputmode="decimal" value="13" style="padding: 0.5rem; border: 1px solid var(--gray-light); border-radius: 6px;">
+            </label>
+            <label style="display: flex; flex-direction: column; gap: 0.25rem;">
+              <span style="font-size: 0.9rem; color: var(--gray);">Imposto (%)</span>
+              <input type="text" id="modal-imposto" inputmode="decimal" value="5" style="padding: 0.5rem; border: 1px solid var(--gray-light); border-radius: 6px;">
+            </label>
+          </div>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="button" onclick="saveAnuncioCosts()">Salvar alterações</button>
+            <a id="modal-link-ml" href="#" target="_blank" style="padding: 0.5rem 1rem; border: 1px solid var(--gray-light); border-radius: 6px; text-decoration: none; color: var(--primary); font-size: 0.9rem;">Ver no ML</a>
+            <a id="modal-link-edit" href="#" target="_blank" style="padding: 0.5rem 1rem; border: 1px solid var(--gray-light); border-radius: 6px; text-decoration: none; color: var(--primary); font-size: 0.9rem;">Editar no ML</a>
+          </div>
+        </div>
+      </div>
+
       <div id="anuncios-container" style="display: none;">
         <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center;">
           <label for="status-filter">Filtrar por status:</label>
@@ -80,6 +132,7 @@
     let currentStatus = 'all';
     let currentOffset = 0;
     const limit = 20;
+    let currentItems = [];
 
     async function checkMLConnection(retries = 2) {
       for (let i = 0; i <= retries; i++) {
@@ -125,14 +178,16 @@
       const soldQuantity = item.sold_quantity || 0;
       const availableQuantity = item.available_quantity || 0;
       const permalink = item.permalink || `https://produto.mercadolivre.com.br/${item.id}`;
+      const editUrl = `https://www.mercadolivre.com.br/vender/editar-anuncio/${item.id}`;
+      const itemId = (item.id || '').replace(/"/g, '').replace(/'/g, '&#39;');
 
       return `
-        <div class="card" style="margin-bottom: 1rem; padding: 1rem;">
+        <div class="card anuncio-card" style="margin-bottom: 1rem; padding: 1rem; cursor: pointer;" data-item-id="${itemId}" onclick="openAnuncioModal(this.dataset.itemId)">
           <div style="display: flex; gap: 1rem;">
             ${thumbnail ? `<img src="${thumbnail}" alt="${item.title}" style="width: 120px; height: 120px; object-fit: cover; border-radius: 4px;">` : ''}
             <div style="flex: 1;">
               <h3 style="margin: 0 0 0.5rem 0; font-size: 1.1rem;">
-                <a href="${permalink}" target="_blank" style="color: var(--primary); text-decoration: none;">${item.title || 'Sem título'}</a>
+                <span style="color: var(--primary); font-weight: 600;">${item.title || 'Sem título'}</span>
               </h3>
               <div style="display: flex; gap: 1rem; margin-top: 0.5rem; flex-wrap: wrap;">
                 <div>
@@ -151,13 +206,86 @@
                   <span>${availableQuantity}</span>
                 </div>
               </div>
-              <div style="margin-top: 0.75rem;">
+              <div style="margin-top: 0.75rem; display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
                 <span style="color: var(--gray); font-size: 0.9rem;">ID: ${item.id}</span>
+                <a href="${permalink}" target="_blank" onclick="event.stopPropagation();" style="font-size: 0.9rem; color: var(--primary);">Ver no ML</a>
+                <a href="${editUrl}" target="_blank" onclick="event.stopPropagation();" style="font-size: 0.9rem; color: var(--primary);">Editar no ML</a>
               </div>
             </div>
           </div>
         </div>
       `;
+    }
+
+    function openAnuncioModal(itemIdOrEl) {
+      try {
+        const id = typeof itemIdOrEl === 'string' ? itemIdOrEl : (itemIdOrEl && itemIdOrEl.dataset && itemIdOrEl.dataset.itemId);
+        if (!id) return;
+        const item = currentItems.find(i => i.id === id) || null;
+        if (!item) return;
+        const modal = document.getElementById('anuncio-modal');
+        const overlay = document.getElementById('modal-overlay');
+        if (!modal || !overlay) return;
+        document.getElementById('modal-item-id').textContent = item.id || '-';
+        document.getElementById('modal-title').textContent = item.title || 'Sem título';
+        document.getElementById('modal-price').textContent = formatPrice(item.price || 0);
+        document.getElementById('modal-status').textContent = formatStatus(item.status || 'unknown');
+        document.getElementById('modal-sold').textContent = item.sold_quantity || 0;
+        document.getElementById('modal-available').textContent = item.available_quantity || 0;
+        document.getElementById('modal-custo').value = item.custo_produto != null ? String(item.custo_produto).replace('.', ',') : '';
+        document.getElementById('modal-embalagem').value = item.embalagem != null ? String(item.embalagem).replace('.', ',') : '0';
+        document.getElementById('modal-frete').value = item.frete != null ? String(item.frete).replace('.', ',') : '0';
+        document.getElementById('modal-taxa').value = item.taxa_pct != null ? String(item.taxa_pct).replace('.', ',') : '13';
+        document.getElementById('modal-imposto').value = item.imposto_pct != null ? String(item.imposto_pct).replace('.', ',') : '5';
+        document.getElementById('modal-link-ml').href = item.permalink || `https://produto.mercadolivre.com.br/${item.id}`;
+        document.getElementById('modal-link-edit').href = `https://www.mercadolivre.com.br/vender/editar-anuncio/${item.id}`;
+        modal.dataset.itemId = item.id;
+        modal.style.display = 'block';
+        overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+      } catch (e) {
+        console.error('Erro ao abrir modal:', e);
+      }
+    }
+
+    function closeAnuncioModal() {
+      const modal = document.getElementById('anuncio-modal');
+      const overlay = document.getElementById('modal-overlay');
+      if (modal) modal.style.display = 'none';
+      if (overlay) overlay.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+
+    async function saveAnuncioCosts() {
+      const modal = document.getElementById('anuncio-modal');
+      if (!modal || !modal.dataset.itemId) return;
+      const itemId = modal.dataset.itemId;
+      const parseVal = (v) => {
+        const s = String(v || '').trim().replace(',', '.');
+        const n = parseFloat(s);
+        return isNaN(n) ? null : n;
+      };
+      const upd = {
+        item_id: itemId,
+        custo_produto: parseVal(document.getElementById('modal-custo').value),
+        embalagem: parseVal(document.getElementById('modal-embalagem').value) ?? 0,
+        frete: parseVal(document.getElementById('modal-frete').value) ?? 0,
+        taxa_pct: parseVal(document.getElementById('modal-taxa').value) ?? 13,
+        imposto_pct: parseVal(document.getElementById('modal-imposto').value) ?? 5,
+      };
+      try {
+        const res = await authFetch(API_BASE + '/api/financial-panel/costs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: [upd] }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Erro');
+        alert('Custos salvos!');
+        closeAnuncioModal();
+        loadAnuncios(currentStatus, currentOffset);
+      } catch (e) {
+        alert(e.message || 'Erro ao salvar.');
+      }
     }
 
     async function loadAnuncios(status = 'active', offset = 0) {
@@ -187,6 +315,7 @@
 
         const data = await res.json();
         const items = data.items || [];
+        currentItems = items;
         const total = data.total || 0;
 
         if (items.length === 0) {

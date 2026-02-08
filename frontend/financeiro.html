@@ -19,6 +19,25 @@
     .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
     .cost-input { width: 70px; padding: 0.3rem; }
     #items-table td, #items-table th { padding: 0.5rem; font-size: 0.9rem; }
+    .btn-insights {
+      background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn-insights:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+    }
+    .btn-insights:active { transform: translateY(0); }
+    .btn-insights-icon { font-size: 1rem; }
   </style>
 </head>
 <body class="app">
@@ -61,7 +80,9 @@
           <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
               <button type="button" id="btn-refresh-ml" class="button">Atualizar dados do ML</button>
-              <button type="button" id="btn-ai-insights" class="button" style="background: #7c3aed;">Insights de IA</button>
+              <button type="button" id="btn-ai-insights" class="button btn-insights">
+                <span class="btn-insights-icon">✨</span> Insights de IA
+              </button>
               <span id="last-update" style="color: var(--gray); font-size: 0.9rem;"></span>
             </div>
           </div>
