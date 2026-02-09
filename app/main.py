@@ -71,6 +71,7 @@ async def _debug_exception_handler(request: Request, exc: Exception):
 
 @app.on_event("startup")
 def startup():
+    logger.info("Backend iniciado. Logs disponíveis em logs/backend.log e no painel Admin.")
     try:
         init_db()
     except Exception as e:

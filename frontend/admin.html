@@ -65,7 +65,7 @@
           <div style="margin-bottom: 0.75rem;">
             <button type="button" id="btn-refresh-logs" class="button" style="font-size: 0.9rem;">Atualizar logs</button>
           </div>
-          <pre id="logs-content" style="background: #0f172a; color: #e2e8f0; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; max-height: 60vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">Carregando…</pre>
+          <pre id="logs-content" style="background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; max-height: 60vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all; min-height: 120px;">Carregando…</pre>
         </div>
       </div>
 
@@ -250,17 +250,18 @@
 
     async function loadLogs() {
       const el = document.getElementById('logs-content');
+      if (!el) return;
       el.textContent = 'Carregando…';
-      el.style.color = '';
+      el.style.color = '#e2e8f0';
       try {
         const res = await authFetch(`${API_BASE}/api/admin/logs`);
         const text = await res.text();
-        el.textContent = text || '(vazio)';
-        if (!res.ok) el.style.color = 'red';
-        else el.scrollTop = el.scrollHeight;
+        el.textContent = (text && text.trim()) ? text : '(Arquivo de log vazio ou inexistente. O backend registra eventos em logs/backend.log.)';
+        el.style.color = res.ok ? '#e2e8f0' : '#fca5a5';
+        if (res.ok) el.scrollTop = el.scrollHeight;
       } catch (e) {
-        el.textContent = 'Erro: ' + e.message;
-        el.style.color = 'red';
+        el.textContent = 'Erro ao carregar logs: ' + (e.message || String(e));
+        el.style.color = '#fca5a5';
       }
     }
 

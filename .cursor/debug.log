@@ -48,3 +48,15 @@
 {"location":"app-nav.js:api/me","message":"app_nav_me_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H3","timestamp":1770595904028}
 {"location":"app-nav.js:me_parsed","message":"app_nav_me_parsed","data":{"isAdmin":true},"hypothesisId":"H3","timestamp":1770595904029}
 {"location":"clerk-auth.js:clerk-config","message":"clerk_config_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H1","timestamp":1770595919453}
+{"location":"clerk-auth.js:clerk-config","message":"clerk_config_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H1","timestamp":1770596223509}
+{"location":"clerk-auth.js:clerk-config","message":"clerk_config_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H1","timestamp":1770596233977}
+{"location":"clerk-auth.js:clerk-config","message":"clerk_config_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H1","timestamp":1770596236860}
+{"location":"app-nav.js:api/me","message":"app_nav_me_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H3","timestamp":1770596237787}
+{"location":"app-nav.js:me_parsed","message":"app_nav_me_parsed","data":{"isAdmin":true},"hypothesisId":"H3","timestamp":1770596237788}
+{"location":"clerk-auth.js:clerk-config","message":"clerk_config_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H1","timestamp":1770596241225}
+{"location":"app-nav.js:api/me","message":"app_nav_me_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H3","timestamp":1770596242152}
+{"location":"app-nav.js:me_parsed","message":"app_nav_me_parsed","data":{"isAdmin":true},"hypothesisId":"H3","timestamp":1770596242153}
+{"location":"clerk-auth.js:clerk-config","message":"clerk_config_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H1","timestamp":1770596307301}
+{"location":"app-nav.js:api/me","message":"app_nav_me_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H3","timestamp":1770596308253}
+{"location":"app-nav.js:me_parsed","message":"app_nav_me_parsed","data":{"isAdmin":true},"hypothesisId":"H3","timestamp":1770596308255}
+{"location":"clerk-auth.js:clerk-config","message":"clerk_config_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H1","timestamp":1770596324905}

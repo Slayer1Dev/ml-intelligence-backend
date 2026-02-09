@@ -287,20 +287,25 @@ def post_answer(access_token: str, question_id: str, text: str) -> Optional[dict
 
 
 def get_item_by_id(access_token: Optional[str], item_id: str) -> Optional[dict]:
-    """Busca um item por ID. Com token retorna detalhes do dono; sem token pode funcionar para itens públicos (GET /items/{id})."""
+    """Busca um item por ID. Tenta com token; se 403, tenta sem token (itens públicos)."""
     if not item_id:
         return None
-    headers = {}
+    headers = {"User-Agent": "MLIntelligence/1.0 (https://mercadoinsights.online)"}
     if access_token:
         headers["Authorization"] = f"Bearer {access_token}"
-    if not headers:
-        headers["User-Agent"] = "MLIntelligence/1.0 (https://mercadoinsights.online)"
     try:
         resp = requests.get(f"{ML_API}/items/{item_id}", headers=headers, timeout=15)
-        if resp.status_code != 200:
-            _log.warning("ML get item %s failed: status=%s", item_id, resp.status_code)
+        if resp.status_code == 200:
+            return resp.json()
+        if resp.status_code == 403 and access_token:
+            headers.pop("Authorization", None)
+            resp2 = requests.get(f"{ML_API}/items/{item_id}", headers=headers, timeout=15)
+            if resp2.status_code == 200:
+                return resp2.json()
+            _log.warning("ML get item %s failed (public): status=%s", item_id, resp2.status_code)
             return None
-        return resp.json()
+        _log.warning("ML get item %s failed: status=%s body=%s", item_id, resp.status_code, resp.text[:150])
+        return None
     except requests.RequestException as e:
         _log.warning("ML get item error: %s", e)
         return None
