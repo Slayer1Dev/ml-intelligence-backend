@@ -1038,21 +1038,28 @@ async def ml_webhook(request: Request, background_tasks: BackgroundTasks):
     try:
         body = await request.json()
     except Exception:
+        logger.warning("Webhook ML: body inválido ou não-JSON")
         return JSONResponse(status_code=400, content={"received": False})
 
     topic = body.get("topic") or body.get("type")
     if topic != "questions":
         return JSONResponse(status_code=200, content={"received": True})
 
-    resource = body.get("resource") or (body.get("data") or {}).get("id") if isinstance(body.get("data"), dict) else None
-    user_id_ml = body.get("user_id") or body.get("seller_id") or (body.get("data") or {}).get("user_id") if isinstance(body.get("data"), dict) else None
+    data = body.get("data") if isinstance(body.get("data"), dict) else {}
+    resource = body.get("resource") or data.get("resource") or data.get("id")
+    user_id_ml = body.get("user_id") or body.get("seller_id") or data.get("user_id") or data.get("seller_id")
+
     question_id = None
-    if isinstance(resource, str) and "questions" in resource:
-        question_id = resource.split("/")[-1].strip() or resource.replace("questions/", "").strip()
-    elif isinstance(resource, str):
-        question_id = resource
+    if isinstance(resource, str):
+        if "questions" in resource:
+            question_id = resource.split("/")[-1].strip() or resource.replace("questions/", "").strip()
+        else:
+            question_id = resource.strip()
     if not question_id:
+        logger.warning("Webhook ML questions: resource vazio. body_keys=%s", list(body.keys()))
         return JSONResponse(status_code=200, content={"received": True})
+
+    logger.info("Webhook ML questions: question_id=%s user_id_ml=%s", question_id, user_id_ml)
 
     user = None
     if user_id_ml is not None:
@@ -1061,14 +1068,24 @@ async def ml_webhook(request: Request, background_tasks: BackgroundTasks):
         db = SessionLocal()
         try:
             for token in db.query(MlToken).all():
-                detail = get_question_detail(token.access_token, question_id)
-                if detail:
-                    user = db.query(User).filter(User.id == token.user_id).first()
-                    break
+                u = db.query(User).filter(User.id == token.user_id).first()
+                if not u:
+                    continue
+                t = get_valid_ml_token(u)
+                if t and t.access_token:
+                    detail = get_question_detail(t.access_token, question_id)
+                    if detail:
+                        user = u
+                        break
         finally:
             db.close()
+
     if user:
         background_tasks.add_task(_process_ml_question_webhook, question_id, user.id)
+        logger.info("Webhook ML questions: tarefa adicionada para user_id=%s question_id=%s", user.id, question_id)
+    else:
+        logger.warning("Webhook ML questions: usuário não encontrado. question_id=%s user_id_ml=%s", question_id, user_id_ml)
+
     return JSONResponse(status_code=200, content={"received": True})
 
 
