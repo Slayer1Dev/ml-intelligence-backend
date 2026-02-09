@@ -745,15 +745,14 @@ def ml_search(
 
 
 def _parse_ml_item_id(url_or_id: str) -> Optional[str]:
-    """Extrai ID do anúncio (MLB123...) de URL do ML ou do próprio ID."""
+    """Extrai ID do anúncio (MLB123...) de URL do ML ou do próprio ID. Aceita MLB-123 ou MLB123."""
     if not url_or_id or not isinstance(url_or_id, str):
         return None
     s = url_or_id.strip()
-    match = re.search(r"MLB\d+", s, re.IGNORECASE)
+    match = re.search(r"MLB-?\d+", s, re.IGNORECASE)
     if match:
-        return match.group(0).upper()
-    if s.upper().startswith("MLB") and s.upper()[3:].isdigit():
-        return s.upper()
+        raw = match.group(0).upper()
+        return raw.replace("-", "") if "-" in raw else raw
     return None
 
 

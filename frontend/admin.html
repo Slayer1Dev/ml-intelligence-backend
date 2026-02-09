@@ -60,8 +60,12 @@
 
       <div id="tab-logs" class="tab-content" style="display:none;">
         <div class="card">
-          <h2 style="margin-bottom: 1rem;">Logs do Backend</h2>
-          <pre id="logs-content" style="background: #0f172a; color: #e2e8f0; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; max-height: 60vh; overflow-y: auto;">Carregando…</pre>
+          <h2 style="margin-bottom: 0.5rem;">Logs do Backend</h2>
+          <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 1rem;">Conteúdo de <code>logs/backend.log</code> (últimas 500 linhas). Atualize para ver novos eventos.</p>
+          <div style="margin-bottom: 0.75rem;">
+            <button type="button" id="btn-refresh-logs" class="button" style="font-size: 0.9rem;">Atualizar logs</button>
+          </div>
+          <pre id="logs-content" style="background: #0f172a; color: #e2e8f0; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; max-height: 60vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">Carregando…</pre>
         </div>
       </div>
 
@@ -246,10 +250,14 @@
 
     async function loadLogs() {
       const el = document.getElementById('logs-content');
+      el.textContent = 'Carregando…';
+      el.style.color = '';
       try {
         const res = await authFetch(`${API_BASE}/api/admin/logs`);
-        el.textContent = await res.text();
+        const text = await res.text();
+        el.textContent = text || '(vazio)';
         if (!res.ok) el.style.color = 'red';
+        else el.scrollTop = el.scrollHeight;
       } catch (e) {
         el.textContent = 'Erro: ' + e.message;
         el.style.color = 'red';
@@ -291,6 +299,7 @@
           showTab(a.dataset.tab);
         });
       });
+      document.getElementById('btn-refresh-logs')?.addEventListener('click', loadLogs);
     }
 
     init();

@@ -37,3 +37,14 @@
 {"location":"clerk-auth.js:clerk-config","message":"clerk_config_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H1","timestamp":1770595450859}
 {"location":"app-nav.js:api/me","message":"app_nav_me_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H3","timestamp":1770595452020}
 {"location":"app-nav.js:me_parsed","message":"app_nav_me_parsed","data":{"isAdmin":true},"hypothesisId":"H3","timestamp":1770595452023}
+{"location":"clerk-auth.js:clerk-config","message":"clerk_config_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H1","timestamp":1770595830552}
+{"location":"app-nav.js:api/me","message":"app_nav_me_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H3","timestamp":1770595833563}
+{"location":"app-nav.js:me_parsed","message":"app_nav_me_parsed","data":{"isAdmin":true},"hypothesisId":"H3","timestamp":1770595833687}
+{"location":"clerk-auth.js:clerk-config","message":"clerk_config_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H1","timestamp":1770595841404}
+{"location":"clerk-auth.js:clerk-config","message":"clerk_config_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H1","timestamp":1770595845413}
+{"location":"app-nav.js:me_parsed","message":"app_nav_me_parsed","data":{"isAdmin":true},"hypothesisId":"H3","timestamp":1770595846484}
+{"location":"app-nav.js:api/me","message":"app_nav_me_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H3","timestamp":1770595846482}
+{"location":"clerk-auth.js:clerk-config","message":"clerk_config_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H1","timestamp":1770595903129}
+{"location":"app-nav.js:api/me","message":"app_nav_me_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H3","timestamp":1770595904028}
+{"location":"app-nav.js:me_parsed","message":"app_nav_me_parsed","data":{"isAdmin":true},"hypothesisId":"H3","timestamp":1770595904029}
+{"location":"clerk-auth.js:clerk-config","message":"clerk_config_response","data":{"status":200,"ok":true,"contentType":"application/json"},"hypothesisId":"H1","timestamp":1770595919453}
