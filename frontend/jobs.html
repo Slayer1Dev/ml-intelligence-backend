@@ -11,7 +11,8 @@
 
   <script>
     async function carregarJobs(){
-      const res = await fetch("http://127.0.0.1:8000/jobs-list");
+      const API_BASE = window.location.origin;
+      const res = await fetch(`${API_BASE}/jobs-list`);
       const data = await res.json();
 
       let html = "";

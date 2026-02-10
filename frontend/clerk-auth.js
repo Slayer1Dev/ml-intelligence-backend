@@ -39,9 +39,6 @@
   // Busca config do backend e inicializa Clerk
   async function initClerk() {
     const res = await fetch(`${API_BASE}/api/clerk-config`);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/93780d09-6b5a-42a9-b230-9dd7e72f883b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'clerk-auth.js:clerk-config',message:'clerk_config_response',data:{status:res.status,ok:res.ok,contentType:res.headers.get('content-type')},hypothesisId:'H1',timestamp:Date.now()})}).catch(function(){});
-    // #endregion
     const config = await window.safeJson(res);
     const pk = config.publishableKey?.trim();
     const frontendApi = config.frontendApi?.trim();

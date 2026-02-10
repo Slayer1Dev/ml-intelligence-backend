@@ -186,16 +186,10 @@
               btn.textContent = 'Redirecionando…';
               try {
                 const u = await authFetch(API_BASE + '/api/ml-auth-url');
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/93780d09-6b5a-42a9-b230-9dd7e72f883b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.html:ml-auth-url',message:'btn_conectar_response',data:{status:u.status,ok:u.ok,contentType:u.headers?.get?.('content-type')},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
                 const d = await u.json();
                 if (u.ok && d.url) window.location.href = d.url;
                 else alert(d.detail || 'Erro ao obter URL.');
               } catch (e) {
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/93780d09-6b5a-42a9-b230-9dd7e72f883b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.html:catch',message:'btn_conectar_catch',data:{error:String(e.message||e)},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
                 alert('Erro: ' + (e.message || 'Não foi possível conectar.'));
               }
               btn.disabled = false;
@@ -204,9 +198,6 @@
           }
         }
       } catch (e) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/93780d09-6b5a-42a9-b230-9dd7e72f883b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.html:init_catch',message:'dashboard_init_catch',data:{error:String(e.message||e)},hypothesisId:'H3',timestamp:Date.now()})}).catch(function(){});
-        // #endregion
         console.warn('Erro ao carregar /api/me:', e);
       }
     }

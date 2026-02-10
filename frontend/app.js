@@ -1,3 +1,5 @@
+const API_BASE = window.location.origin;
+
 async function upload() {
   let file = document.getElementById("file").files[0];
   if (!file) return alert("Escolha um arquivo");
@@ -5,7 +7,7 @@ async function upload() {
   let form = new FormData();
   form.append("file", file);
 
-  let res = await fetch("http://127.0.0.1:8000/upload-planilha", {
+  let res = await fetch(`${API_BASE}/upload-planilha`, {
     method: "POST",
     body: form
   });
@@ -15,7 +17,7 @@ async function upload() {
 }
 
 async function loadJobs() {
-  let res = await fetch("http://127.0.0.1:8000/jobs");
+  let res = await fetch(`${API_BASE}/jobs`);
   let data = await res.json();
 
   let div = document.getElementById("jobs");
@@ -29,13 +31,13 @@ async function loadJobs() {
 }
 
 async function viewJob(id) {
-  let res = await fetch(`http://127.0.0.1:8000/jobs/${id}`);
+  let res = await fetch(`${API_BASE}/jobs/${id}`);
   let data = await res.json();
   alert(JSON.stringify(data, null, 2));
 }
 
 async function loadLogs() {
-  let res = await fetch("http://127.0.0.1:8000/logs");
+  let res = await fetch(`${API_BASE}/logs`);
   let data = await res.text();
   document.getElementById("logs").innerText = data;
 }
