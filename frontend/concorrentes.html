@@ -104,7 +104,7 @@
         <!-- Busca por termo -->
         <div class="card" style="margin-bottom: 1.5rem;">
           <h2 style="margin-top: 0;">Buscar concorrentes por termo</h2>
-          <p style="color: var(--gray); font-size: 0.85rem; margin-bottom: 0.5rem;">Pode retornar 403 se o app não estiver certificado no ML. Use o campo acima para adicionar concorrentes por link.</p>
+          <p style="color: var(--gray); font-size: 0.85rem; margin-bottom: 0.5rem;">A busca por termo pode estar restrita pelo ML. <strong>Use o campo acima para adicionar concorrentes por link ou ID</strong> — funciona sem certificação.</p>
           <div class="search-box">
             <input type="text" id="search-input" placeholder="Ex: fone bluetooth, notebook gamer..." autocomplete="off">
             <select id="sort-select" style="padding: 0.75rem; border: 1px solid var(--gray-light); border-radius: 8px;">
@@ -352,21 +352,21 @@
           document.getElementById('concorrentes-container').style.display = 'none';
           return;
         }
-        if (res.status === 403) {
+        if (res.status === 403 || res.status === 503) {
+          const errData = await res.json().catch(() => ({}));
+          const msg = errData.detail || 'A busca está restrita para este app.';
           document.getElementById('results-list').innerHTML = `
             <div class="card" style="padding: 1.5rem;">
-              <p><strong>A busca do Mercado Livre retornou 403.</strong></p>
-              <p>O app pode precisar de certificação no ML. Como alternativa:</p>
-              <ul style="margin: 1rem 0;">
-                <li><a href="dashboard.html">Reconecte sua conta</a> no dashboard</li>
-              </ul>
+              <p><strong>Busca por termo indisponível</strong></p>
+              <p>${msg.replace(/\*\*/g, '').replace(/\n/g, ' ')}</p>
+              <p style="margin-top: 1rem;">Use <strong>Adicionar concorrente por link ou ID</strong> no topo da página para acompanhar concorrentes pelo link do anúncio.</p>
             </div>`;
           btn.disabled = false;
           return;
         }
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || (res.status === 503 ? 'Busca temporariamente indisponível. Tente reconectar sua conta no dashboard.' : 'Erro na busca'));
+          throw new Error(errData.detail || 'Erro na busca');
         }
         const data = await res.json();
         const results = data.results || [];
@@ -438,11 +438,17 @@
         const res = await authFetch(`${API_BASE}/api/ml/compare/${itemId}`);
         if (res.status === 403) {
           document.getElementById('ml-not-connected').style.display = 'block';
+          btn.disabled = false;
           return;
         }
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || (res.status === 503 ? 'Comparação temporariamente indisponível.' : 'Erro na comparação'));
+          const msg = (errData.detail || (res.status === 503 ? 'A comparação na busca exige certificação do app no ML.' : 'Erro na comparação')).replace(/\*\*/g, '');
+          document.getElementById('compare-title').textContent = 'Comparação';
+          document.getElementById('compare-summary').innerHTML = '<p style="color: #dc2626;">' + msg + '</p><p style="margin-top: 0.75rem;">Compare preços e vendidos na lista <strong>Meus concorrentes cadastrados</strong> (adicione concorrentes pelo link no topo).</p>';
+          document.getElementById('compare-list').innerHTML = '';
+          btn.disabled = false;
+          return;
         }
         const data = await res.json();
         const { my_item, results, search_term, user_position, total_results, in_top_50 } = data;

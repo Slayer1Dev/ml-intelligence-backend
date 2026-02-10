@@ -85,7 +85,11 @@
             <p id="telegram-msg" style="font-size: 0.85rem; margin-top: 0.5rem;"></p>
           </div>
         </div>
-        <h2 style="font-size: 1.1rem; margin-bottom: 1rem;">Aguardando sua aprovação</h2>
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
+          <h2 style="font-size: 1.1rem; margin: 0;">Aguardando sua aprovação</h2>
+          <button type="button" id="btn-sync-questions" class="button" style="font-size: 0.9rem;">Buscar perguntas agora</button>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--gray); margin: -0.5rem 0 1rem 0;">Se as perguntas não aparecerem sozinhas (webhook), use este botão para buscar no Mercado Livre.</p>
         <div id="pending-list"></div>
       </div>
     </main>
@@ -302,6 +306,27 @@
         updateTelegramUI(me);
         document.getElementById('btn-link-telegram')?.addEventListener('click', linkTelegram);
         loadPending();
+        var btnSync = document.getElementById('btn-sync-questions');
+        if (btnSync) {
+          btnSync.addEventListener('click', async function () {
+            btnSync.disabled = true;
+            btnSync.textContent = 'Buscando...';
+            try {
+              var r = await authFetch(API_BASE + '/api/ml/questions/sync', { method: 'POST' });
+              var d = await r.json();
+              if (r.ok) {
+                if (d.synced > 0) loadPending();
+                alert(d.message || (d.synced ? d.synced + ' pergunta(s) trazida(s).' : 'Nenhuma pergunta nova.'));
+              } else {
+                alert(d.detail || 'Erro ao buscar perguntas.');
+              }
+            } catch (e) {
+              alert('Erro: ' + (e.message || 'Tente novamente.'));
+            }
+            btnSync.disabled = false;
+            btnSync.textContent = 'Buscar perguntas agora';
+          });
+        }
       }
     }
     init();

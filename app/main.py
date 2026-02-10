@@ -740,7 +740,7 @@ def ml_search(
     if result is None:
         raise HTTPException(
             status_code=503,
-            detail="Busca indisponível. Verifique sua conexão ou tente novamente em instantes.",
+            detail="A busca do Mercado Livre está restrita para este app. Use **Adicionar concorrente por link ou ID** acima para acompanhar concorrentes.",
         )
     return result
 
@@ -863,7 +863,7 @@ def ml_compare(
     if result is None:
         raise HTTPException(
             status_code=503,
-            detail="Comparação indisponível. Tente reconectar sua conta no dashboard.",
+            detail="A comparação na busca exige certificação do app no ML. Compare preços e vendidos na lista **Meus concorrentes cadastrados** (adicione concorrentes pelo link).",
         )
     
     results = result.get("results", [])
@@ -1186,6 +1186,35 @@ def ml_questions_metrics(user: User = Depends(paid_guard)):
         "avg_time_to_answer_seconds": round(avg_seconds, 0) if avg_seconds is not None else None,
         "avg_time_to_answer_hours": round(avg_seconds / 3600, 2) if avg_seconds is not None else None,
     }
+
+
+@app.post("/api/ml/questions/sync")
+def ml_questions_sync(user: User = Depends(paid_guard)):
+    """Busca perguntas não respondidas no ML e enfileira para aprovação (não depende do webhook)."""
+    token = get_valid_ml_token(user)
+    if not token or not token.seller_id:
+        raise HTTPException(status_code=403, detail="ml_not_connected")
+    result = get_questions_search(token.access_token, seller_id=token.seller_id, limit=50, offset=0)
+    if result is None:
+        raise HTTPException(status_code=503, detail="Não foi possível buscar perguntas no Mercado Livre. Tente novamente.")
+    questions = result.get("questions") or []
+    db = SessionLocal()
+    enqueued = 0
+    try:
+        for q in questions:
+            status = (q.get("status") or "").upper()
+            if status in ("ANSWERED", "BANNED", "DELETED", "DISABLED"):
+                continue
+            question_id = str(q.get("id") or "").strip()
+            if not question_id:
+                continue
+            if db.query(PendingQuestion).filter(PendingQuestion.user_id == user.id, PendingQuestion.question_id == question_id).first():
+                continue
+            _process_ml_question_webhook(question_id, user.id)
+            enqueued += 1
+        return {"ok": True, "synced": enqueued, "message": f"{enqueued} pergunta(s) trazida(s) para aprovação." if enqueued else "Nenhuma pergunta nova para aprovar."}
+    finally:
+        db.close()
 
 
 @app.post("/api/ml/questions/{question_id}/publish")
