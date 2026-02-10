@@ -308,7 +308,8 @@ def post_answer(access_token: str, question_id: str, text: str) -> Optional[dict
 
 
 def get_item_by_id(access_token: Optional[str], item_id: str) -> Optional[dict]:
-    """Busca um item por ID. Tenta com token; se 403, tenta sem token (itens públicos)."""
+    """Busca um item por ID. Tenta com token; se 403, tenta sem token (itens públicos).
+    Retorna dict com 'error' se houver falha, para melhor diagnóstico."""
     if not item_id:
         return None
     headers = {"User-Agent": "MLIntelligence/1.0 (https://mercadoinsights.online)"}
@@ -324,9 +325,41 @@ def get_item_by_id(access_token: Optional[str], item_id: str) -> Optional[dict]:
             if resp2.status_code == 200:
                 return resp2.json()
             _log.warning("ML get item %s failed (public): status=%s", item_id, resp2.status_code)
-            return None
-        _log.warning("ML get item %s failed: status=%s body=%s", item_id, resp.status_code, resp.text[:150])
-        return None
+            # Retorna dict com informações do erro
+            error_detail = "Erro desconhecido"
+            try:
+                error_json = resp2.json()
+                error_detail = error_json.get("message") or error_json.get("error") or resp2.text[:200]
+            except Exception:
+                error_detail = resp2.text[:200]
+            
+            return {
+                "error": True,
+                "status_code": resp2.status_code,
+                "message": error_detail,
+                "detail": f"API ML retornou {resp2.status_code}: {error_detail}"
+            }
+        
+        # Extrai detalhes do erro
+        error_detail = "Erro desconhecido"
+        try:
+            error_json = resp.json()
+            error_detail = error_json.get("message") or error_json.get("error") or resp.text[:200]
+        except Exception:
+            error_detail = resp.text[:200]
+        
+        _log.warning("ML get item %s failed: status=%s body=%s", item_id, resp.status_code, error_detail)
+        return {
+            "error": True,
+            "status_code": resp.status_code,
+            "message": error_detail,
+            "detail": f"API ML retornou {resp.status_code}: {error_detail}"
+        }
     except requests.RequestException as e:
         _log.warning("ML get item error: %s", e)
-        return None
+        return {
+            "error": True,
+            "status_code": 0,
+            "message": str(e),
+            "detail": f"Erro de conexão: {type(e).__name__}"
+        }

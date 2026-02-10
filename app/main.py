@@ -797,9 +797,40 @@ def ml_competitors_add(data: AddCompetitorInput, user: User = Depends(paid_guard
     item_id = _parse_ml_item_id(data.item_id or data.url or "")
     if not item_id:
         raise HTTPException(status_code=400, detail="Informe o ID do anúncio (ex: MLB123456) ou a URL do produto no Mercado Livre.")
+    
     item = get_item_by_id(token.access_token, item_id)
+    
+    # Verifica se retornou erro
+    if item and item.get("error"):
+        error_info = item
+        status_code = error_info.get("status_code", 0)
+        error_message = error_info.get("message", "Erro desconhecido")
+        
+        # Mensagens específicas por tipo de erro
+        if status_code == 0:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Erro de conexão com a API do Mercado Livre: {error_message}. Verifique sua conexão e tente novamente."
+            )
+        elif status_code == 404:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Anúncio {item_id} não encontrado no Mercado Livre. Verifique se o ID está correto e se o anúncio está ativo."
+            )
+        elif status_code == 403:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Acesso negado ao anúncio {item_id}. Verifique se sua conta ML está conectada corretamente."
+            )
+        else:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Erro ao buscar anúncio no Mercado Livre ({status_code}): {error_message}"
+            )
+    
     if not item:
         raise HTTPException(status_code=404, detail="Anúncio não encontrado no Mercado Livre. Verifique o ID ou a URL.")
+    
     db = SessionLocal()
     try:
         existing = db.query(CompetitorItem).filter(CompetitorItem.user_id == user.id, CompetitorItem.item_id == item_id).first()
@@ -827,7 +858,8 @@ def ml_competitors_list(user: User = Depends(paid_guard)):
         items = []
         for r in rows:
             detail = get_item_by_id(token.access_token, r.item_id)
-            if detail:
+            # Verifica se retornou erro ou dados válidos
+            if detail and not detail.get("error"):
                 items.append({
                     "item_id": r.item_id,
                     "nickname": r.nickname,
@@ -838,6 +870,7 @@ def ml_competitors_list(user: User = Depends(paid_guard)):
                     "thumbnail": detail.get("thumbnail"),
                 })
             else:
+                # Produto não encontrado ou erro - mostra dados vazios
                 items.append({"item_id": r.item_id, "nickname": r.nickname, "title": None, "price": None, "sold_quantity": None, "permalink": None, "thumbnail": None})
         return {"items": items}
     finally:

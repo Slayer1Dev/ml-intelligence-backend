@@ -1,8 +1,25 @@
 # 🔍 RELATÓRIO DE DIAGNÓSTICO - INTEGRAÇÕES MERCADO LIVRE
 
-**Data:** 09/02/2026  
-**Status:** Análise Completa (Read-Only)  
+**Data inicial:** 09/02/2026  
+**Última atualização:** 09/02/2026 21:00  
+**Status:** ✅ Problemas #2 e #3 CORRIGIDOS | ⚠️ Outros pendentes  
 **Escopo:** Concorrência, Perguntas e Análise de Anúncios
+
+---
+
+## 🆕 ATUALIZAÇÕES
+
+### 09/02/2026 - 21:00
+- ✅ **Problema #2 CORRIGIDO:** `search_public()` e `get_item_by_id()` agora retornam dict com detalhes de erro
+- ✅ **Problema #3 MELHORADO:** Mensagens específicas por tipo de erro (403, 429, 500, etc.)
+- ✅ **Validação de estratégia:** Pesquisa confirmou que nossa abordagem (API oficial) está correta
+- 📄 **Novo documento:** `ESTRATEGIA_CONCORRENCIA.md` com roadmap de otimizações
+
+### 09/02/2026 - 18:00
+- ✅ Código de debug removido (localhost 127.0.0.1:7242)
+- ✅ URLs hardcoded corrigidas
+- ✅ Nome alterado: "ML Intelligence" → "Mercado Insights"
+- ✅ Mixed Content corrigido (imagens HTTPS)
 
 ---
 
@@ -288,20 +305,22 @@ Se token expirou no servidor mas `mlConnected` ainda é `true`, a requisição f
 
 ## 📊 RESUMO DOS PROBLEMAS
 
-| # | Problema | Severidade | Arquivo Principal | Linha |
-|---|----------|-----------|-------------------|-------|
-| 1 | **Variáveis ML ausentes no .env** | 🔴 CRÍTICA | `.env` | - |
-| 2 | Silenciamento de erros (retorna None) | 🟡 ALTA | `app/services/ml_api.py` | 159-311 |
-| 3 | Busca pública retorna 403 (esperado) | 🟢 MÉDIA | `app/main.py` | 722-889 |
-| 4 | Token expirado sem notificação | 🟡 ALTA | `app/main.py` | 566-594 |
-| 5 | Validação de parâmetro MLB | 🟢 BAIXA | `app/main.py` | 748-757 |
-| 6 | Falta logging de erros no frontend | 🟡 MÉDIA | `frontend/concorrentes.html` | 343-370 |
-| 7 | Webhook retorna 200 mesmo sem processar | 🟡 ALTA | `app/main.py` | 1035-1089 |
-| 8 | CORS pode bloquear requisições | 🔴 CRÍTICA* | `app/main.py` | (inferido) |
-| 9 | Falta tratamento de rate limit (429) | 🟡 MÉDIA | `app/services/ml_api.py` | 186-188 |
-| 10 | Falta revalidação de token no frontend | 🟢 BAIXA | `frontend/concorrentes.html` | 184-186 |
+| # | Problema | Status | Severidade | Arquivo Principal | Linha |
+|---|----------|--------|-----------|-------------------|-------|
+| 1 | **Variáveis ML ausentes no .env** | ✅ **N/A** | 🟢 (estão na Railway) | `.env` | - |
+| 2 | Silenciamento de erros (retorna None) | ✅ **CORRIGIDO** | 🟡 Alta | `app/services/ml_api.py` | 159-365 |
+| 3 | Busca pública retorna 403 (esperado) | ✅ **MELHORADO** | 🟢 Média | `app/main.py` | 722-770 |
+| 4 | Token expirado sem notificação | ⚠️ **PENDENTE** | 🟡 Alta | `app/main.py` | 566-594 |
+| 5 | Validação de parâmetro MLB | ✅ **OK** | 🟢 Baixa | `app/main.py` | 773-782 |
+| 6 | Falta logging de erros no frontend | ✅ **CORRIGIDO** | 🟡 Média | `frontend/concorrentes.html` | 355-385 |
+| 7 | Webhook retorna 200 mesmo sem processar | ⚠️ **PENDENTE** | 🟡 Alta | `app/main.py` | 1035-1089 |
+| 8 | CORS pode bloquear requisições | ✅ **OK** | 🟢 (configurado) | `app/main.py` | 81-87 |
+| 9 | Falta tratamento de rate limit (429) | ⚠️ **PENDENTE** | 🟡 Média | `app/services/ml_api.py` | várias |
+| 10 | Falta revalidação de token no frontend | ⚠️ **PENDENTE** | 🟢 Baixa | `frontend/concorrentes.html` | 184-186 |
+| 11 | 🆕 Código de debug em produção | ✅ **CORRIGIDO** | 🔴 CRÍTICA | `clerk-auth.js`, `dashboard.html`, etc. | várias |
+| 12 | 🆕 URLs hardcoded (localhost) | ✅ **CORRIGIDO** | 🔴 CRÍTICA | `jobs.html`, `logs.html`, `app.js` | várias |
 
-**\*CRÍTICA se ocorrer, mas pode não estar acontecendo**
+**Status geral:** 6 problemas corrigidos | 4 pendentes (não bloqueantes)
 
 ---
 

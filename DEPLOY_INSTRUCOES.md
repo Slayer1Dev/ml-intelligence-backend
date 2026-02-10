@@ -1,11 +1,24 @@
 # 🚀 INSTRUÇÕES DE DEPLOY - MERCADO INSIGHTS
 
 **Site:** https://www.mercadoinsights.online  
-**Data:** 09/02/2026
+**Última atualização:** 09/02/2026 21:00
 
 ---
 
 ## ✅ CORREÇÕES APLICADAS (PRONTAS PARA DEPLOY)
+
+### 🆕 **NOVA CORREÇÃO (09/02 - 21:00): Mensagens de Erro Específicas**
+- **Problema:** "Adicionar concorrente" mostrava "Anúncio não encontrado" para TODOS os erros (conexão, 404, 500)
+- **Correção:** Mensagens específicas por tipo de erro:
+  - Erro de conexão → "Erro de conexão com a API do Mercado Livre..."
+  - 404 → "Anúncio MLB123 não encontrado. Verifique se está ativo."
+  - 403 → "Acesso negado. Verifique se sua conta ML está conectada."
+  - 500 → "Erro no servidor do Mercado Livre (500)..."
+- **Arquivos:** `app/services/ml_api.py`, `app/main.py`
+
+---
+
+### ✅ **CORREÇÕES ANTERIORES:**
 
 ### 1. ✅ Código de debug removido
 - **9 blocos** de telemetria `127.0.0.1:7242` removidos
@@ -213,16 +226,19 @@ Se aparecer warning: configure chaves de produção (seção acima)
 2. ✅ Aguardar deploy (2-3min)
 3. ✅ Limpar cache do navegador
 4. ✅ Testar site
+5. 🆕 **Testar "Adicionar concorrente por link/ID"** (deve mostrar erro claro se falhar)
 
 ### Depois (Recomendado):
 1. ⚠️ Configurar Clerk em produção (remove warning)
 2. 📊 Monitorar logs na Railway
 3. 🧪 Testar todas as funcionalidades
+4. 📖 Ler `ESTRATEGIA_CONCORRENCIA.md` para melhorias futuras
 
-### Opcional:
-- Corrigir outros problemas do `RELATORIO_BUGS.md` (#4, #7, #9)
-- Implementar retry para rate limit (429)
-- Adicionar cache de resultados de busca
+### Melhorias Futuras (Ver `ESTRATEGIA_CONCORRENCIA.md`):
+- 🚀 **Multiget:** Buscar até 20 produtos por requisição (20x mais rápido)
+- 💾 **Cache:** Reduzir calls à API ML
+- ⏱️ **Rate limiting:** Evitar bloqueio por excesso de requisições
+- 📊 **Histórico de preços:** Armazenar para análise de tendências
 
 ---
 
@@ -242,6 +258,23 @@ A: Após deploy + limpar cache, devem carregar via HTTPS.
 
 **Q: A busca ainda retorna 503!**  
 A: Normal! Seu app ML não é certificado. Use "Adicionar por link/ID".
+
+**Q: "Adicionar por link/ID" retorna erro!**  
+A: Agora mostra erro específico:
+  - "Erro de conexão" → Problema de rede
+  - "Anúncio não encontrado" → ID inválido ou produto removido
+  - "Acesso negado" → Token ML expirado, reconecte conta
+
+**Q: Por que comparadores (Zoom, Buscapé) funcionam e o meu não?**  
+A: Eles usam a mesma API! Nossa abordagem está correta. Ver `ESTRATEGIA_CONCORRENCIA.md`.
+
+---
+
+## 📚 DOCUMENTAÇÃO ADICIONAL
+
+- **`ESTRATEGIA_CONCORRENCIA.md`** → Como comparadores profissionais funcionam + Roadmap de melhorias
+- **`RELATORIO_BUGS.md`** → Todos os problemas identificados
+- **`CORRECAO_APLICADA_PESQUISA.md`** → Detalhes da correção de busca
 
 ---
 
