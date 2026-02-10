@@ -58,7 +58,7 @@ if not any(isinstance(h, logging.FileHandler) and getattr(h, "baseFilename", "")
 _CORS_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
 _CORS_LIST = [o.strip() for o in _CORS_ORIGINS.split(",") if o.strip()] if _CORS_ORIGINS != "*" else ["*"]
 
-app = FastAPI(title="ML Intelligence Backend")
+app = FastAPI(title="Mercado Insights Backend")
 
 
 @app.exception_handler(Exception)

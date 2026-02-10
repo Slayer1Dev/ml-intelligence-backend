@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/png" href="favicon.png">
-  <title>Concorrentes — ML Intelligence</title>
+  <title>Concorrentes — Mercado Insights</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -34,7 +34,7 @@
 </head>
 <body class="app">
   <header class="app-header">
-    <a href="dashboard.html" class="app-logo">ML Intelligence</a>
+    <a href="dashboard.html" class="app-logo">Mercado Insights</a>
     <span class="app-user">Olá, vendedor</span>
     <div id="clerk-user-button"></div>
   </header>
@@ -162,6 +162,12 @@
     function formatPrice(p) {
       return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p || 0);
     }
+    
+    // Fix Mixed Content: force HTTPS for ML images
+    function fixImageUrl(url) {
+      if (!url) return '';
+      return url.replace(/^http:\/\//i, 'https://');
+    }
 
     async function checkAccess() {
       try {
@@ -268,7 +274,7 @@
           const price = it.price != null ? formatPrice(it.price) : '—';
           const sold = it.sold_quantity != null ? it.sold_quantity : '—';
           return '<div class="result-row">' +
-            (it.thumbnail ? '<img class="thumb" src="' + it.thumbnail + '" alt="">' : '') +
+            (it.thumbnail ? '<img class="thumb" src="' + fixImageUrl(it.thumbnail) + '" alt="">' : '') +
             '<div class="info" style="flex:1;">' +
               '<a href="' + link + '" target="_blank" rel="noopener" style="color: var(--primary);">' + (title || it.item_id) + '</a>' +
               '<div style="margin-top: 0.25rem;"><span class="price">' + price + '</span> ' +
@@ -409,7 +415,7 @@
             return `
               <div class="result-row">
                 <span class="pos">#${pos}</span>
-                ${thumb ? `<img class="thumb" src="${thumb}" alt="">` : ''}
+                ${thumb ? `<img class="thumb" src="${fixImageUrl(thumb)}" alt="">` : ''}
                 <div class="info">
                   <a href="${link}" target="_blank" style="color: var(--primary); text-decoration: none;">${r.title || 'Sem título'}</a>
                   <div style="margin-top: 0.25rem;">
@@ -516,7 +522,7 @@
           return `
             <div class="result-row ${isMine ? 'mine' : ''}">
               <span class="pos">#${pos}</span>
-              ${thumb ? `<img class="thumb" src="${thumb}" alt="">` : ''}
+              ${thumb ? `<img class="thumb" src="${fixImageUrl(thumb)}" alt="">` : ''}
               <div class="info">
                 ${isMine ? '<span class="badge">Seu anúncio</span> ' : ''}
                 <a href="${link}" target="_blank" style="color: var(--primary); text-decoration: none;">${r.title || 'Sem título'}</a>

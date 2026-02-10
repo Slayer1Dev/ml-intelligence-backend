@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/png" href="favicon.png">
-  <title>Meus Anuncios — ML Intelligence</title>
+  <title>Meus Anuncios — Mercado Insights</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -15,7 +15,7 @@
 </head>
 <body class="app">
   <header class="app-header">
-    <a href="dashboard.html" class="app-logo">ML Intelligence</a>
+    <a href="dashboard.html" class="app-logo">Mercado Insights</a>
     <span class="app-user">Ola, vendedor</span>
     <div id="clerk-user-button"></div>
   </header>
@@ -164,6 +164,12 @@
     function formatPrice(price) {
       return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price);
     }
+    
+    // Fix Mixed Content: force HTTPS for ML images
+    function fixImageUrl(url) {
+      if (!url) return '';
+      return url.replace(/^http:\/\//i, 'https://');
+    }
 
     function formatStatus(status) {
       const statusMap = {
@@ -189,7 +195,7 @@
       return `
         <div class="card anuncio-card" style="margin-bottom: 1rem; padding: 1rem; cursor: pointer;" data-item-id="${itemId}" onclick="openAnuncioModal(this.dataset.itemId)">
           <div style="display: flex; gap: 1rem;">
-            ${thumbnail ? `<img src="${thumbnail}" alt="${item.title}" style="width: 120px; height: 120px; object-fit: cover; border-radius: 4px;">` : ''}
+            ${thumbnail ? `<img src="${fixImageUrl(thumbnail)}" alt="${item.title}" style="width: 120px; height: 120px; object-fit: cover; border-radius: 4px;">` : ''}
             <div style="flex: 1;">
               <h3 style="margin: 0 0 0.5rem 0; font-size: 1.1rem;">
                 <span style="color: var(--primary); font-weight: 600;">${item.title || 'Sem título'}</span>
