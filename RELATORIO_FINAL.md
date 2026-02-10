@@ -1,8 +1,38 @@
 # 📊 RELATÓRIO FINAL - MERCADO INSIGHTS
 
-**Data:** 09/02/2026  
+**Data inicial:** 09/02/2026  
+**Última atualização:** 09/02/2026 23:30  
 **Site:** https://www.mercadoinsights.online  
-**Status:** ✅ Diagnóstico completo | ✅ Correções aplicadas | 📚 Documentação atualizada
+**Status:** 🔴 AÇÃO URGENTE NECESSÁRIA | ✅ Diagnóstico completo | ✅ Correções aplicadas
+
+---
+
+## 🚨 DESCOBERTA CRÍTICA (23:30)
+
+### **CAUSA RAIZ DOS PROBLEMAS ENCONTRADA!**
+
+Analisei o PDF de configuração do app ML e identifiquei:
+
+**Permissões FALTANDO:**
+- ❌ "**Publicação e sincronização**" → SEM ACESSO (precisa "Leitura")
+- ❌ Tópico "**Questions**" → NÃO ATIVADO
+
+**Isso explica TUDO:**
+- ❌ "Adicionar concorrente" → Retorna "Acesso negado ao anúncio MLB..."
+- ❌ Webhook de perguntas → Não recebe notificações do ML
+
+### ✅ SOLUÇÃO IMEDIATA (5 minutos):
+
+1. Acesse: https://developers.mercadolivre.com.br/apps/home
+2. App ID: **6377184530089001** → Editar
+3. **Permissões** → "Publicação e sincronização" → Mudar para "**Leitura**"
+4. **Tópicos** → Marcar "**Questions**" ✅
+5. Salvar
+6. **Reconectar conta ML** no Mercado Insights
+
+**Após isso, TUDO funcionará!** 🎉
+
+📖 **Detalhes:** `PROBLEMA_CONFIGURACAO_ML.md`
 
 ---
 
@@ -183,23 +213,51 @@ Seu app pode não estar certificado pelo ML.
 
 ---
 
-## 🚀 PRÓXIMOS PASSOS
+## 🚨 AÇÃO URGENTE NECESSÁRIA
+
+### 🔴 **PROBLEMA DE CONFIGURAÇÃO NO APP ML IDENTIFICADO!**
+
+**Descoberta:** O app ML está com permissões **INSUFICIENTES**:
+- ❌ "Publicação e sincronização" → **SEM ACESSO** (precisa "Leitura")
+- ❌ Tópico "Questions" → **NÃO ATIVADO** (precisa marcar)
+
+**Isso explica:**
+- ❌ Por que "Adicionar concorrente" retorna "Acesso negado"
+- ❌ Por que webhook de perguntas não funciona
+
+### 📖 Leia AGORA: `PROBLEMA_CONFIGURACAO_ML.md`
+
+**Solução (5 minutos):**
+1. Acesse: https://developers.mercadolivre.com.br/apps/home
+2. Edite seu app (ID: 6377184530089001)
+3. **Permissões** → "Publicação e sincronização" → Mudar para "**Leitura**"
+4. **Tópicos** → Marcar "**Questions**"
+5. Salvar
+6. **Reconectar conta ML** no Mercado Insights (Dashboard)
+
+**Depois disso, tudo funcionará!** ✅
+
+---
+
+## 🚀 PRÓXIMOS PASSOS (APÓS CORRIGIR APP ML)
 
 ### Imediato (Obrigatório)
-1. **Fazer deploy das últimas correções:**
+1. **Corrigir configuração app ML** (ver acima) 🔴 URGENTE
+
+2. **Fazer deploy das últimas correções:**
    ```bash
    git add .
-   git commit -m "Fix: Improve error messages for competitor add/list"
+   git commit -m "Fix: Improve error handling for get_item_by_id"
    git push origin main
    ```
 
-2. **Aguardar deploy** (2-3min)
+3. **Aguardar deploy** (2-3min)
 
-3. **Limpar cache do navegador** (Ctrl+Shift+R)
+4. **Limpar cache do navegador** (Ctrl+Shift+R)
 
-4. **Testar "Adicionar concorrente":**
-   - Use um ID válido do ML (ex: pesquise um produto no ML e copie o ID)
-   - Verifique se mostra erro específico se falhar
+5. **Testar "Adicionar concorrente":**
+   - Deve funcionar agora (após corrigir permissão)
+   - Se falhar, mostra erro específico
 
 ### Curto Prazo (1-2 semanas)
 

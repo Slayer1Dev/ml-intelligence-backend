@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <title>Configurações Mercado Livre — Mercado Insights</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+  <style>
+    .status-card { background: #fff; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 2px solid #e5e7eb; }
+    .status-card.connected { border-color: #059669; background: #f0fdf4; }
+    .status-card.disconnected { border-color: #dc2626; background: #fef2f2; }
+    .status-badge { display: inline-block; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem; }
+    .status-badge.connected { background: #059669; color: white; }
+    .status-badge.disconnected { background: #dc2626; color: white; }
+    .info-row { display: flex; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid #e5e7eb; }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: var(--gray); font-weight: 500; }
+    .info-value { font-family: 'Courier New', monospace; font-size: 0.9rem; }
+    .btn-config { padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; font-size: 0.95rem; transition: all 0.2s; }
+    .btn-connect { background: var(--blue-primary); color: white; }
+    .btn-connect:hover { background: var(--blue-dark); transform: translateY(-1px); }
+    .btn-disconnect { background: #dc2626; color: white; }
+    .btn-disconnect:hover { background: #b91c1c; transform: translateY(-1px); }
+    .btn-test { background: #64748b; color: white; }
+    .btn-test:hover { background: #475569; }
+    .btn-config:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .diagnostic-section { background: #f8fafc; border-radius: 8px; padding: 1rem; margin-top: 1rem; font-size: 0.9rem; }
+    .diagnostic-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; }
+    .diagnostic-item .icon { font-size: 1.2rem; }
+    .log-box { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 0.85rem; max-height: 300px; overflow-y: auto; margin-top: 1rem; }
+  </style>
+</head>
+<body class="app">
+  <header class="app-header">
+    <a href="dashboard.html" class="app-logo">Mercado Insights</a>
+    <span class="app-user">Olá, vendedor</span>
+    <div id="clerk-user-button"></div>
+  </header>
+
+  <div id="clerk-signin" style="display:none;"></div>
+
+  <div id="app-content" class="app-body">
+    <aside class="app-sidebar">
+      <nav>
+        <a href="dashboard.html">Resumo</a>
+        <a href="financeiro.html">Painel Financeiro</a>
+        <a href="calculator.html">Calculadora de Lucro</a>
+        <a href="anuncios.html">Meus Anúncios</a>
+        <a href="performance.html">Performance</a>
+        <a href="concorrentes.html">Concorrentes</a>
+        <a href="perguntas-anuncios.html">Perguntas nos anúncios</a>
+        <a href="ia-assistente.html">IA Assistente</a>
+        <a href="config-ml.html" class="active">⚙️ Config. Mercado Livre</a>
+        <span id="admin-link-wrap" style="display:none;"><hr style="margin: 0.5rem 0; border-color: var(--gray-light);"><a href="admin.html">⚙️ Admin</a></span>
+      </nav>
+    </aside>
+
+    <main class="app-main">
+      <h1>Configurações Mercado Livre</h1>
+      <p class="subtitle">Gerencie a conexão do Mercado Insights com sua conta do Mercado Livre.</p>
+
+      <!-- Status da Conexão -->
+      <div id="status-card" class="status-card disconnected">
+        <h2 style="margin-top: 0; display: flex; align-items: center; gap: 1rem;">
+          <span>Status da Conexão</span>
+          <span id="status-badge" class="status-badge disconnected">Desconectado</span>
+        </h2>
+        <div id="connection-info"></div>
+        <div style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+          <button id="btn-connect" class="btn-config btn-connect">Conectar Mercado Livre</button>
+          <button id="btn-disconnect" class="btn-config btn-disconnect" style="display: none;">Desconectar</button>
+          <button id="btn-refresh-status" class="btn-config btn-test">Atualizar Status</button>
+        </div>
+      </div>
+
+      <!-- Diagnóstico Avançado -->
+      <div class="card">
+        <h2 style="margin-top: 0;">Diagnóstico Avançado</h2>
+        <p style="color: var(--gray); font-size: 0.9rem;">Verifica permissões, testa APIs e identifica problemas.</p>
+        <button id="btn-diagnostic" class="btn-config btn-test" style="margin-top: 1rem;">Executar Diagnóstico</button>
+        <div id="diagnostic-results" style="display: none;"></div>
+      </div>
+
+      <!-- Teste de API -->
+      <div class="card">
+        <h2 style="margin-top: 0;">Testar API do Mercado Livre</h2>
+        <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 1rem;">Teste se consegue buscar um produto específico.</p>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <input type="text" id="test-item-id" placeholder="Ex: MLB4443868923" style="flex: 1; min-width: 200px; padding: 0.75rem; border: 1px solid var(--gray-light); border-radius: 8px;">
+          <button id="btn-test-api" class="btn-config btn-test">Testar</button>
+        </div>
+        <div id="test-results" style="margin-top: 1rem;"></div>
+      </div>
+
+      <!-- Logs de Debug -->
+      <div class="card">
+        <h2 style="margin-top: 0;">Logs de Debug</h2>
+        <p style="color: var(--gray); font-size: 0.9rem;">Histórico de ações e requisições.</p>
+        <button id="btn-clear-logs" class="btn-config btn-test" style="margin-top: 0.5rem; font-size: 0.85rem;">Limpar Logs</button>
+        <div id="log-box" class="log-box"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="clerk-auth.js"></script>
+  <script src="app-nav.js"></script>
+  <script>
+    const API_BASE = window.location.origin;
+    let logs = [];
+
+    function addLog(message, type = 'info') {
+      const timestamp = new Date().toLocaleString('pt-BR');
+      const icon = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+      logs.push(`[${timestamp}] ${icon} ${message}`);
+      updateLogBox();
+      console.log(`[Config ML] ${message}`);
+    }
+
+    function updateLogBox() {
+      const logBox = document.getElementById('log-box');
+      if (logs.length === 0) {
+        logBox.innerHTML = '<div style="color: #94a3b8;">Nenhum log ainda. Execute ações acima para ver logs.</div>';
+      } else {
+        logBox.innerHTML = logs.slice(-50).reverse().join('\n');
+        logBox.scrollTop = 0;
+      }
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return 'N/A';
+      try {
+        return new Date(dateStr).toLocaleString('pt-BR');
+      } catch {
+        return dateStr;
+      }
+    }
+
+    async function loadStatus() {
+      addLog('Carregando status da conexão...');
+      try {
+        const res = await authFetch(`${API_BASE}/api/ml-diagnostic`);
+        const data = await res.json();
+        
+        if (!res.ok) {
+          addLog(`Erro ao carregar status: ${data.detail || 'Erro desconhecido'}`, 'error');
+          return;
+        }
+
+        const connected = data.connected === true;
+        const statusCard = document.getElementById('status-card');
+        const statusBadge = document.getElementById('status-badge');
+        const btnConnect = document.getElementById('btn-connect');
+        const btnDisconnect = document.getElementById('btn-disconnect');
+        const connectionInfo = document.getElementById('connection-info');
+
+        // Atualiza visual
+        statusCard.className = connected ? 'status-card connected' : 'status-card disconnected';
+        statusBadge.className = connected ? 'status-badge connected' : 'status-badge disconnected';
+        statusBadge.textContent = connected ? 'Conectado' : 'Desconectado';
+        
+        btnConnect.style.display = connected ? 'none' : 'inline-block';
+        btnDisconnect.style.display = connected ? 'inline-block' : 'none';
+
+        // Informações detalhadas
+        if (connected) {
+          const expiresAt = data.expires_at ? formatDate(data.expires_at) : 'N/A';
+          const isExpired = data.token_expired === true;
+          const timeLeft = data.time_until_expiry_minutes != null ? Math.round(data.time_until_expiry_minutes) : null;
+          
+          connectionInfo.innerHTML = `
+            <div class="info-row">
+              <span class="info-label">Seller ID:</span>
+              <span class="info-value">${data.seller_id || 'N/A'}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Token expira em:</span>
+              <span class="info-value" style="color: ${isExpired ? '#dc2626' : timeLeft < 60 ? '#f59e0b' : '#059669'};">
+                ${isExpired ? '❌ Expirado' : timeLeft != null ? `${timeLeft} minutos` : expiresAt}
+              </span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Data de expiração:</span>
+              <span class="info-value">${expiresAt}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Conectado desde:</span>
+              <span class="info-value">${data.created_at ? formatDate(data.created_at) : 'N/A'}</span>
+            </div>
+          `;
+          
+          if (isExpired) {
+            connectionInfo.innerHTML += `
+              <div style="margin-top: 1rem; padding: 1rem; background: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
+                <p style="margin: 0; color: #dc2626; font-weight: 600;">⚠️ Token expirado!</p>
+                <p style="margin: 0.5rem 0 0 0; color: #991b1b; font-size: 0.9rem;">
+                  Reconecte sua conta clicando em "Conectar Mercado Livre" acima.
+                </p>
+              </div>
+            `;
+          } else if (timeLeft < 60) {
+            connectionInfo.innerHTML += `
+              <div style="margin-top: 1rem; padding: 1rem; background: #fffbeb; border-radius: 8px; border: 1px solid #fef3c7;">
+                <p style="margin: 0; color: #d97706; font-weight: 600;">⏰ Token próximo de expirar</p>
+                <p style="margin: 0.5rem 0 0 0; color: #92400e; font-size: 0.9rem;">
+                  O token será renovado automaticamente. Se houver problemas, reconecte manualmente.
+                </p>
+              </div>
+            `;
+          }
+          
+          addLog('Status carregado: Conectado', 'success');
+        } else {
+          connectionInfo.innerHTML = `
+            <p style="color: var(--gray); margin-top: 1rem;">
+              Nenhuma conta do Mercado Livre conectada. Clique em "Conectar Mercado Livre" para autorizar.
+            </p>
+          `;
+          addLog('Status carregado: Desconectado', 'warning');
+        }
+      } catch (e) {
+        addLog(`Erro ao carregar status: ${e.message}`, 'error');
+        console.error(e);
+      }
+    }
+
+    async function connectML() {
+      const btn = document.getElementById('btn-connect');
+      btn.disabled = true;
+      btn.textContent = 'Redirecionando...';
+      addLog('Iniciando conexão com Mercado Livre...');
+      
+      try {
+        const res = await authFetch(`${API_BASE}/api/ml-auth-url`);
+        const data = await res.json();
+        
+        if (res.ok && data.url) {
+          addLog('Redirecionando para autorização ML...', 'success');
+          window.location.href = data.url;
+        } else {
+          addLog(`Erro ao obter URL: ${data.detail || 'Erro desconhecido'}`, 'error');
+          alert(data.detail || 'Erro ao obter URL de autorização.');
+        }
+      } catch (e) {
+        addLog(`Erro de conexão: ${e.message}`, 'error');
+        alert('Erro: ' + (e.message || 'Não foi possível conectar.'));
+      }
+      
+      btn.disabled = false;
+      btn.textContent = 'Conectar Mercado Livre';
+    }
+
+    async function disconnectML() {
+      if (!confirm('Tem certeza que deseja desconectar sua conta do Mercado Livre? Você precisará autorizar novamente para usar as funcionalidades.')) {
+        return;
+      }
+      
+      const btn = document.getElementById('btn-disconnect');
+      btn.disabled = true;
+      btn.textContent = 'Desconectando...';
+      addLog('Desconectando conta do Mercado Livre...');
+      
+      try {
+        const res = await authFetch(`${API_BASE}/api/ml-disconnect`, { method: 'DELETE' });
+        const data = await res.json();
+        
+        if (res.ok) {
+          addLog('Conta desconectada com sucesso!', 'success');
+          alert('Conta desconectada com sucesso.');
+          loadStatus();
+        } else {
+          addLog(`Erro ao desconectar: ${data.detail || 'Erro desconhecido'}`, 'error');
+          alert(data.detail || 'Erro ao desconectar.');
+        }
+      } catch (e) {
+        addLog(`Erro ao desconectar: ${e.message}`, 'error');
+        alert('Erro: ' + (e.message || 'Não foi possível desconectar.'));
+      }
+      
+      btn.disabled = false;
+      btn.textContent = 'Desconectar';
+    }
+
+    async function runDiagnostic() {
+      const btn = document.getElementById('btn-diagnostic');
+      const resultsDiv = document.getElementById('diagnostic-results');
+      
+      btn.disabled = true;
+      btn.textContent = 'Executando...';
+      resultsDiv.style.display = 'block';
+      resultsDiv.innerHTML = '<p>Executando diagnóstico completo...</p>';
+      addLog('Iniciando diagnóstico avançado...');
+      
+      try {
+        const res = await authFetch(`${API_BASE}/api/ml-diagnostic`);
+        const data = await res.json();
+        
+        if (!res.ok) {
+          resultsDiv.innerHTML = `<div class="diagnostic-section"><p style="color: #dc2626;">❌ Erro: ${data.detail || 'Falha ao executar diagnóstico.'}</p></div>`;
+          addLog(`Diagnóstico falhou: ${data.detail}`, 'error');
+          return;
+        }
+
+        addLog('Diagnóstico concluído', 'success');
+
+        // Monta resultado visual
+        let html = '<div class="diagnostic-section"><h3 style="margin-top: 0;">Resultado do Diagnóstico</h3>';
+        
+        // Status de conexão
+        html += `<div class="diagnostic-item">
+          <span class="icon">${data.connected ? '✅' : '❌'}</span>
+          <span><strong>Conexão:</strong> ${data.connected ? 'Conectado' : 'Desconectado'}</span>
+        </div>`;
+
+        // Token válido
+        if (data.connected) {
+          html += `<div class="diagnostic-item">
+            <span class="icon">${data.token_expired ? '❌' : '✅'}</span>
+            <span><strong>Token:</strong> ${data.token_expired ? 'Expirado' : 'Válido'}</span>
+          </div>`;
+        }
+
+        // Testes de API
+        if (data.tests) {
+          html += '<hr style="margin: 1rem 0;"><h4 style="margin: 0.5rem 0;">Testes de API:</h4>';
+          
+          for (const [testName, testResult] of Object.entries(data.tests)) {
+            const passed = testResult.success === true;
+            html += `<div class="diagnostic-item">
+              <span class="icon">${passed ? '✅' : '❌'}</span>
+              <span><strong>${testName}:</strong> ${testResult.message || (passed ? 'OK' : 'Falhou')}</span>
+            </div>`;
+          }
+        }
+
+        // Permissões
+        if (data.scopes) {
+          html += '<hr style="margin: 1rem 0;"><h4 style="margin: 0.5rem 0;">Permissões do Token:</h4>';
+          html += `<div style="font-size: 0.85rem; color: var(--gray); margin-top: 0.5rem;">${data.scopes.join(', ') || 'Nenhuma'}</div>`;
+        }
+
+        // Recomendações
+        if (data.recommendations && data.recommendations.length > 0) {
+          html += '<hr style="margin: 1rem 0;"><h4 style="margin: 0.5rem 0;">Recomendações:</h4>';
+          data.recommendations.forEach(rec => {
+            html += `<div class="diagnostic-item">
+              <span class="icon">💡</span>
+              <span>${rec}</span>
+            </div>`;
+          });
+        }
+
+        html += '</div>';
+        resultsDiv.innerHTML = html;
+        
+      } catch (e) {
+        resultsDiv.innerHTML = `<div class="diagnostic-section"><p style="color: #dc2626;">❌ Erro: ${e.message}</p></div>`;
+        addLog(`Erro no diagnóstico: ${e.message}`, 'error');
+      }
+      
+      btn.disabled = false;
+      btn.textContent = 'Executar Diagnóstico';
+    }
+
+    async function testAPI() {
+      const itemId = document.getElementById('test-item-id').value.trim();
+      const btn = document.getElementById('btn-test-api');
+      const resultsDiv = document.getElementById('test-results');
+      
+      if (!itemId) {
+        alert('Digite um ID de produto do Mercado Livre (ex: MLB123456).');
+        return;
+      }
+      
+      btn.disabled = true;
+      btn.textContent = 'Testando...';
+      resultsDiv.innerHTML = '<p>Buscando produto...</p>';
+      addLog(`Testando API com item: ${itemId}`);
+      
+      try {
+        const res = await authFetch(`${API_BASE}/api/ml-test-item/${encodeURIComponent(itemId)}`);
+        const data = await res.json();
+        
+        if (res.ok && data.success) {
+          const item = data.item;
+          resultsDiv.innerHTML = `
+            <div style="padding: 1rem; background: #f0fdf4; border-radius: 8px; border: 1px solid #86efac;">
+              <p style="color: #059669; font-weight: 600; margin: 0;">✅ Teste bem-sucedido!</p>
+              <p style="margin: 0.75rem 0 0 0; color: #065f46;">
+                <strong>Produto:</strong> ${item.title || 'N/A'}<br>
+                <strong>Preço:</strong> R$ ${item.price || '0'}<br>
+                <strong>Vendidos:</strong> ${item.sold_quantity || 0}<br>
+                <strong>Status:</strong> ${item.status || 'N/A'}
+              </p>
+            </div>
+          `;
+          addLog(`Teste OK: ${item.title}`, 'success');
+        } else {
+          resultsDiv.innerHTML = `
+            <div style="padding: 1rem; background: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
+              <p style="color: #dc2626; font-weight: 600; margin: 0;">❌ Teste falhou</p>
+              <p style="margin: 0.5rem 0 0 0; color: #991b1b; font-size: 0.9rem;">
+                ${data.detail || data.message || 'Erro desconhecido'}
+              </p>
+            </div>
+          `;
+          addLog(`Teste falhou: ${data.detail || data.message}`, 'error');
+        }
+      } catch (e) {
+        resultsDiv.innerHTML = `
+          <div style="padding: 1rem; background: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
+            <p style="color: #dc2626; font-weight: 600; margin: 0;">❌ Erro de conexão</p>
+            <p style="margin: 0.5rem 0 0 0; color: #991b1b; font-size: 0.9rem;">${e.message}</p>
+          </div>
+        `;
+        addLog(`Erro no teste: ${e.message}`, 'error');
+      }
+      
+      btn.disabled = false;
+      btn.textContent = 'Testar';
+    }
+
+    async function init() {
+      await initClerkAuth({ 
+        signInContainerId: 'clerk-signin', 
+        userButtonContainerId: 'clerk-user-button', 
+        appContentId: 'app-content' 
+      });
+      
+      if (!window.ClerkAuth?.signedIn) return;
+
+      addLog('Página de configurações ML carregada');
+      updateLogBox();
+      
+      await loadStatus();
+
+      document.getElementById('btn-connect').addEventListener('click', connectML);
+      document.getElementById('btn-disconnect').addEventListener('click', disconnectML);
+      document.getElementById('btn-refresh-status').addEventListener('click', loadStatus);
+      document.getElementById('btn-diagnostic').addEventListener('click', runDiagnostic);
+      document.getElementById('btn-test-api').addEventListener('click', testAPI);
+      document.getElementById('btn-clear-logs').addEventListener('click', () => {
+        logs = [];
+        updateLogBox();
+        addLog('Logs limpos');
+      });
+      
+      // Atualiza status a cada 30 segundos
+      setInterval(loadStatus, 30000);
+    }
+
+    init();
+  </script>
+</body>
+</html>

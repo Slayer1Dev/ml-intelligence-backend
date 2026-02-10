@@ -6,6 +6,19 @@
 
 ---
 
+## 🚨 URGENTE - LEIA PRIMEIRO!
+
+### 🔴 **PROBLEMA DE CONFIGURAÇÃO NO APP ML IDENTIFICADO!**
+
+👉 **Leia AGORA:** `PROBLEMA_CONFIGURACAO_ML.md`  
+→ Seu app ML está com permissões **FALTANDO**  
+→ Isso explica por que "Adicionar concorrente" retorna "Acesso negado"  
+→ Solução: 5 minutos no portal do ML
+
+**Depois de corrigir, continue:**
+
+---
+
 ## 🎯 COMECE AQUI
 
 ### Você acabou de ver os prints do console?
@@ -22,6 +35,11 @@
 
 👉 **Leia:** `ESTRATEGIA_CONCORRENCIA.md`  
 → Como comparadores funcionam, validação da nossa abordagem
+
+### Quer implementar polling de perguntas?
+
+👉 **Leia:** `IMPLEMENTACAO_POLLING_PERGUNTAS.md`  
+→ Busca automática a cada 30min + ao abrir página
 
 ---
 
@@ -63,10 +81,12 @@
 
 | Documento | Conteúdo | Quando usar |
 |-----------|----------|-----------|
+| **`PROBLEMA_CONFIGURACAO_ML.md`** | 🔴 URGENTE - Permissões faltando no app ML | **LEIA PRIMEIRO!** |
 | **`LEIA-ME.md`** | **Este arquivo** - Índice de navegação | Sempre (começo) |
-| **`RELATORIO_FINAL.md`** | Resumo executivo completo | Primeiro |
+| **`RELATORIO_FINAL.md`** | Resumo executivo completo | Segundo |
 | **`DEPLOY_INSTRUCOES.md`** | Passo a passo de deploy | Antes de deploy |
 | **`ESTRATEGIA_CONCORRENCIA.md`** | Validação técnica + Roadmap | Planejamento |
+| **`IMPLEMENTACAO_POLLING_PERGUNTAS.md`** | Polling automático de perguntas | Implementação futura |
 
 ### 🔍 Diagnóstico
 

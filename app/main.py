@@ -601,6 +601,178 @@ def ml_status(user: User = Depends(get_current_user)):
     return {"connected": token is not None, "seller_id": token.seller_id if token else None}
 
 
+@app.delete("/api/ml-disconnect")
+def ml_disconnect(user: User = Depends(get_current_user)):
+    """Desconecta a conta do Mercado Livre (remove token do banco)."""
+    db = SessionLocal()
+    try:
+        token = db.query(MlToken).filter(MlToken.user_id == user.id).first()
+        if not token:
+            raise HTTPException(status_code=404, detail="Nenhuma conta ML conectada.")
+        
+        db.delete(token)
+        db.commit()
+        logger.info(f"Conta ML desconectada para user_id={user.id}")
+        return {"ok": True, "message": "Conta do Mercado Livre desconectada com sucesso."}
+    finally:
+        db.close()
+
+
+@app.get("/api/ml-diagnostic")
+def ml_diagnostic(user: User = Depends(get_current_user)):
+    """Diagnóstico detalhado da conexão ML com testes de API e permissões."""
+    from datetime import datetime, timedelta
+    
+    db = SessionLocal()
+    try:
+        token = db.query(MlToken).filter(MlToken.user_id == user.id).first()
+        
+        if not token:
+            return {
+                "connected": False,
+                "message": "Nenhuma conta ML conectada.",
+                "recommendations": [
+                    "Clique em 'Conectar Mercado Livre' para autorizar sua conta.",
+                ]
+            }
+        
+        # Verifica expiração
+        now = datetime.utcnow()
+        is_expired = token.expires_at and token.expires_at <= now
+        time_until_expiry = None
+        if token.expires_at:
+            delta = token.expires_at - now
+            time_until_expiry = delta.total_seconds() / 60  # minutos
+        
+        # Tenta renovar se expirado
+        if is_expired:
+            new_tokens = refresh_access_token(token.refresh_token)
+            if new_tokens and "access_token" in new_tokens:
+                token.access_token = new_tokens.get("access_token", "")
+                if "refresh_token" in new_tokens:
+                    token.refresh_token = new_tokens.get("refresh_token", "")
+                expires_in = new_tokens.get("expires_in")
+                if expires_in:
+                    token.expires_at = datetime.utcnow() + timedelta(seconds=int(expires_in))
+                db.commit()
+                is_expired = False
+                logger.info(f"Token ML renovado durante diagnóstico para user_id={user.id}")
+        
+        # Testes de API
+        tests = {}
+        recommendations = []
+        
+        # Teste 1: Buscar informações do usuário
+        user_info = get_user_info(token.access_token)
+        tests["Buscar dados do usuário (/users/me)"] = {
+            "success": user_info is not None,
+            "message": "OK - Dados do usuário carregados" if user_info else "Falhou - Token pode estar inválido"
+        }
+        if not user_info:
+            recommendations.append("Token inválido. Reconecte sua conta ML.")
+        
+        # Teste 2: Buscar anúncios (verifica permissão Items)
+        if user_info and token.seller_id:
+            items = get_user_items(token.access_token, token.seller_id, status="active", limit=1)
+            tests["Buscar anúncios (/users/{id}/items/search)"] = {
+                "success": items is not None,
+                "message": "OK - Permissão 'Items' ativa" if items else "Falhou - Sem permissão 'Publicação e sincronização'"
+            }
+            if not items:
+                recommendations.append("⚠️ CRÍTICO: Ative permissão 'Publicação e sincronização' (Leitura) no portal ML.")
+        
+        # Teste 3: Buscar perguntas (verifica permissão Comunicações)
+        if token.seller_id:
+            questions = get_questions_search(token.access_token, seller_id=token.seller_id, limit=1)
+            tests["Buscar perguntas (/questions/search)"] = {
+                "success": questions is not None,
+                "message": "OK - Permissão 'Comunicações' ativa" if questions else "Falhou - Sem permissão 'Comunicações'"
+            }
+            if not questions:
+                recommendations.append("Permissão 'Comunicações' pode não estar habilitada no portal ML.")
+        
+        # Teste 4: Buscar produto público (verifica acesso básico)
+        test_item = get_item_by_id(token.access_token, "MLB2172237836")  # Produto de teste público
+        tests["Buscar produto público (/items/{id})"] = {
+            "success": test_item is not None and not test_item.get("error"),
+            "message": "OK - Acesso a produtos" if (test_item and not test_item.get("error")) else "Falhou - Verifique permissões"
+        }
+        if test_item and test_item.get("error") and test_item.get("status_code") == 403:
+            recommendations.append("⚠️ Erro 403 ao buscar produtos. Verifique permissão 'Publicação e sincronização' no portal ML.")
+        
+        # Scopes do token (se disponível)
+        scopes = []
+        if user_info and "scopes" in user_info:
+            scopes = user_info.get("scopes", [])
+        
+        # Recomendações gerais
+        if is_expired:
+            recommendations.append("Token expirado. Será renovado automaticamente na próxima requisição.")
+        elif time_until_expiry and time_until_expiry < 60:
+            recommendations.append(f"Token expira em {int(time_until_expiry)} minutos. Será renovado automaticamente.")
+        
+        if not recommendations:
+            recommendations.append("✅ Tudo OK! Conexão e permissões estão corretas.")
+        
+        return {
+            "connected": True,
+            "seller_id": token.seller_id,
+            "expires_at": token.expires_at.isoformat() if token.expires_at else None,
+            "created_at": token.created_at.isoformat() if token.created_at else None,
+            "token_expired": is_expired,
+            "time_until_expiry_minutes": time_until_expiry,
+            "tests": tests,
+            "scopes": scopes,
+            "recommendations": recommendations
+        }
+    
+    finally:
+        db.close()
+
+
+@app.get("/api/ml-test-item/{item_id}")
+def ml_test_item(item_id: str, user: User = Depends(get_current_user)):
+    """Testa se consegue buscar um produto específico do ML."""
+    token = get_valid_ml_token(user)
+    if not token:
+        raise HTTPException(status_code=403, detail="Conta ML não conectada. Conecte primeiro.")
+    
+    item = get_item_by_id(token.access_token, item_id)
+    
+    # Verifica se retornou erro
+    if item and item.get("error"):
+        error_info = item
+        status_code = error_info.get("status_code", 0)
+        error_message = error_info.get("message", "Erro desconhecido")
+        
+        return {
+            "success": False,
+            "error": True,
+            "status_code": status_code,
+            "message": error_message,
+            "detail": f"Falhou ao buscar item {item_id}: {error_message}"
+        }
+    
+    if not item:
+        return {
+            "success": False,
+            "message": f"Anúncio {item_id} não encontrado no Mercado Livre."
+        }
+    
+    return {
+        "success": True,
+        "item": {
+            "id": item.get("id"),
+            "title": item.get("title"),
+            "price": item.get("price"),
+            "sold_quantity": item.get("sold_quantity"),
+            "status": item.get("status"),
+            "permalink": item.get("permalink"),
+        },
+        "message": f"Produto encontrado: {item.get('title', 'N/A')}"
+    }
+
+
 @app.get("/api/ml/items")
 def ml_items(
     status: str = "active",
