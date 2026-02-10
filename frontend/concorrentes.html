@@ -355,11 +355,33 @@
         if (res.status === 403 || res.status === 503) {
           const errData = await res.json().catch(() => ({}));
           const msg = errData.detail || 'A busca está restrita para este app.';
+          
+          // Log do erro para diagnóstico (pode remover depois)
+          console.error('[ML Search] Erro na busca:', {
+            status: res.status,
+            detail: errData.detail,
+            timestamp: new Date().toISOString()
+          });
+          
+          // Identifica o tipo de erro para mostrar ícone apropriado
+          let icon = '⚠️';
+          let title = 'Busca por termo indisponível';
+          if (msg.includes('429') || msg.includes('Limite de requisições')) {
+            icon = '⏱️';
+            title = 'Limite de requisições atingido';
+          } else if (msg.includes('500') || msg.includes('servidor')) {
+            icon = '🔧';
+            title = 'Erro temporário no servidor ML';
+          }
+          
           document.getElementById('results-list').innerHTML = `
             <div class="card" style="padding: 1.5rem;">
-              <p><strong>Busca por termo indisponível</strong></p>
-              <p>${msg.replace(/\*\*/g, '').replace(/\n/g, ' ')}</p>
-              <p style="margin-top: 1rem;">Use <strong>Adicionar concorrente por link ou ID</strong> no topo da página para acompanhar concorrentes pelo link do anúncio.</p>
+              <p style="font-size: 2rem; margin: 0;">${icon}</p>
+              <p><strong>${title}</strong></p>
+              <p style="margin-top: 0.5rem; color: var(--gray);">${msg.replace(/\*\*/g, '<strong>').replace(/\*\*/g, '</strong>')}</p>
+              <p style="margin-top: 1rem; padding: 1rem; background: #f8fafc; border-radius: 8px;">
+                💡 <strong>Solução:</strong> Use <strong>Adicionar concorrente por link ou ID</strong> no topo da página para acompanhar concorrentes pelo link do anúncio.
+              </p>
             </div>`;
           btn.disabled = false;
           return;
@@ -417,7 +439,18 @@
           pagEl.innerHTML = '';
         }
       } catch (e) {
-        document.getElementById('results-list').innerHTML = '<p style="color: red;">' + (e.message || 'Erro ao buscar. Tente novamente.') + '</p>';
+        console.error('[ML Search] Exceção capturada:', {
+          message: e.message,
+          stack: e.stack,
+          timestamp: new Date().toISOString()
+        });
+        
+        document.getElementById('results-list').innerHTML = `
+          <div style="padding: 1rem; background: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
+            <p style="color: #dc2626; margin: 0;"><strong>❌ Erro ao buscar</strong></p>
+            <p style="color: #991b1b; margin: 0.5rem 0 0 0; font-size: 0.9rem;">${e.message || 'Erro desconhecido. Tente novamente.'}</p>
+            <p style="color: #6b7280; margin: 0.5rem 0 0 0; font-size: 0.85rem;">💡 Verifique sua conexão ou tente adicionar concorrente por link/ID.</p>
+          </div>`;
       }
       btn.disabled = false;
     }

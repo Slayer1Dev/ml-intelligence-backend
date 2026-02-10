@@ -167,6 +167,7 @@ def search_public(
     """Busca no Mercado Livre. Funciona com ou sem token; com token tende a ser mais estável.
     
     Retorna anúncios do marketplace com: id, title, price, sold_quantity, permalink, etc.
+    Retorna dict com 'error' se houver falha, para melhor diagnóstico.
     """
     if not q or not q.strip():
         return None
@@ -184,12 +185,32 @@ def search_public(
     try:
         resp = requests.get(f"{ML_API}/sites/{site_id}/search", params=params, headers=headers, timeout=15)
         if resp.status_code != 200:
-            _log.warning("ML search failed: status=%s body=%s", resp.status_code, resp.text[:200])
-            return None
+            # Tenta extrair mensagem de erro do ML
+            error_detail = "Erro desconhecido"
+            try:
+                error_json = resp.json()
+                error_detail = error_json.get("message") or error_json.get("error") or resp.text[:200]
+            except Exception:
+                error_detail = resp.text[:200]
+            
+            _log.warning("ML search failed: status=%s body=%s", resp.status_code, error_detail)
+            
+            # Retorna dict com informações do erro para diagnóstico
+            return {
+                "error": True,
+                "status_code": resp.status_code,
+                "message": error_detail,
+                "detail": f"API ML retornou {resp.status_code}: {error_detail}"
+            }
         return resp.json()
     except requests.RequestException as e:
         _log.warning("ML search request error: %s", e)
-        return None
+        return {
+            "error": True,
+            "status_code": 0,
+            "message": str(e),
+            "detail": f"Erro de conexão: {type(e).__name__}"
+        }
 
 
 def get_multiple_items(access_token: str, item_ids: List[str]) -> Optional[List[dict]]:

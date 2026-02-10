@@ -730,18 +730,43 @@ def ml_search(
     """Busca no ML — lista concorrentes por termo. Usa busca pública (sem token) pois token gera 403 em apps não certificados."""
     if not q or len(q.strip()) < 2:
         raise HTTPException(status_code=400, detail="Digite pelo menos 2 caracteres para buscar.")
+    
     # Prioriza busca SEM token: API ML retorna 403 com token em apps não certificados
     result = search_public(site_id="MLB", q=q.strip(), limit=limit, offset=offset, sort=sort, access_token=None)
-    if result is None:
+    
+    # Verifica se houve erro na primeira tentativa
+    if result and result.get("error"):
+        error_status = result.get("status_code", 0)
+        logger.info(f"Busca sem token falhou com status {error_status}, tentando com token...")
+        
+        # Se foi 403, tenta com token (pode ser restrição de app não autenticado)
         token = get_valid_ml_token(user)
         access_token = token.access_token if token else None
         if access_token:
             result = search_public(site_id="MLB", q=q.strip(), limit=limit, offset=offset, sort=sort, access_token=access_token)
-    if result is None:
-        raise HTTPException(
-            status_code=503,
-            detail="A busca do Mercado Livre está restrita para este app. Use **Adicionar concorrente por link ou ID** acima para acompanhar concorrentes.",
-        )
+    
+    # Se result é None ou ainda tem erro
+    if result is None or result.get("error"):
+        error_info = result if result and result.get("error") else {}
+        status_code = error_info.get("status_code", 0)
+        error_message = error_info.get("message", "Erro desconhecido")
+        
+        # Mensagens específicas por código de erro
+        if status_code == 403:
+            detail = "A busca do Mercado Livre está restrita para este app (403 Forbidden). Seu app pode não estar certificado pelo ML. Use **Adicionar concorrente por link ou ID** acima para acompanhar concorrentes."
+        elif status_code == 429:
+            detail = "Limite de requisições atingido (429 Too Many Requests). Aguarde alguns minutos e tente novamente."
+        elif status_code == 404:
+            detail = "Endpoint de busca não encontrado (404). Verifique se o site_id 'MLB' está correto."
+        elif status_code >= 500:
+            detail = f"Erro no servidor do Mercado Livre ({status_code}). Tente novamente em alguns minutos."
+        elif status_code == 0:
+            detail = f"Erro de conexão com a API do Mercado Livre: {error_message}"
+        else:
+            detail = f"Erro ao buscar no Mercado Livre ({status_code}): {error_message}"
+        
+        raise HTTPException(status_code=503, detail=detail)
+    
     return result
 
 
@@ -858,13 +883,23 @@ def ml_compare(
     
     # Busca pública primeiro (token gera 403 em apps não certificados)
     result = search_public(site_id="MLB", q=search_term[:80], limit=50, offset=0, access_token=None)
-    if result is None:
+    
+    # Verifica se houve erro e tenta com token
+    if result and result.get("error"):
+        logger.info(f"Comparação sem token falhou, tentando com token...")
         result = search_public(site_id="MLB", q=search_term[:80], limit=50, offset=0, access_token=token.access_token)
-    if result is None:
-        raise HTTPException(
-            status_code=503,
-            detail="A comparação na busca exige certificação do app no ML. Compare preços e vendidos na lista **Meus concorrentes cadastrados** (adicione concorrentes pelo link).",
-        )
+    
+    # Se ainda tem erro ou é None
+    if result is None or result.get("error"):
+        error_info = result if result and result.get("error") else {}
+        status_code = error_info.get("status_code", 0)
+        
+        if status_code == 403:
+            detail = "A comparação na busca exige certificação do app no ML (403 Forbidden). Compare preços e vendidos na lista **Meus concorrentes cadastrados** (adicione concorrentes pelo link)."
+        else:
+            detail = "A comparação na busca não está disponível no momento. Compare preços e vendidos na lista **Meus concorrentes cadastrados** (adicione concorrentes pelo link)."
+        
+        raise HTTPException(status_code=503, detail=detail)
     
     results = result.get("results", [])
     paging = result.get("paging", {})
