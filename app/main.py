@@ -108,6 +108,7 @@ from app.services.ml_api import (
     exchange_code_for_tokens,
     get_auth_url,
     refresh_access_token,
+    get_user_info,
     get_user_items,
     get_item_details,
     get_item_description,
@@ -728,6 +729,129 @@ def ml_diagnostic(user: User = Depends(get_current_user)):
     
     finally:
         db.close()
+
+
+def _build_diagnostic_report(user: User) -> str:
+    """Gera relatório de diagnóstico completo em texto para download."""
+    from datetime import datetime, timedelta
+    lines = []
+    lines.append("=" * 60)
+    lines.append("MERCADO INSIGHTS - RELATÓRIO DE DIAGNÓSTICO")
+    lines.append("=" * 60)
+    lines.append(f"Data/Hora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (UTC)")
+    lines.append(f"User ID: {user.id}")
+    lines.append("")
+
+    # 1. Variáveis de ambiente (presença apenas, sem valores sensíveis)
+    lines.append("-" * 60)
+    lines.append("1. VARIÁVEIS DE AMBIENTE")
+    lines.append("-" * 60)
+    env_vars = [
+        "ML_APP_ID", "ML_SECRET", "ML_REDIRECT_URI",
+        "CLERK_SECRET_KEY", "CLERK_PUBLISHABLE_KEY",
+        "STRIPE_SECRET_KEY", "MP_ACCESS_TOKEN", "MP_WEBHOOK_SECRET",
+        "OPENAI_API_KEY", "DATABASE_URL",
+    ]
+    for var in env_vars:
+        val = os.getenv(var)
+        status = "OK (configurado)" if val and len(str(val).strip()) > 0 else "AUSENTE ou vazio"
+        lines.append(f"  {var}: {status}")
+    lines.append("")
+
+    # 2. Diagnóstico ML (conexão, token, testes)
+    lines.append("-" * 60)
+    lines.append("2. CONEXÃO MERCADO LIVRE")
+    lines.append("-" * 60)
+    db = SessionLocal()
+    try:
+        token = db.query(MlToken).filter(MlToken.user_id == user.id).first()
+        if not token:
+            lines.append("  Status: NENHUMA CONTA ML CONECTADA")
+            lines.append("  Ação: Conecte sua conta em Config > Mercado Livre")
+        else:
+            now = datetime.utcnow()
+            is_expired = token.expires_at and token.expires_at <= now
+            lines.append(f"  Status: Conectado")
+            lines.append(f"  Seller ID: {token.seller_id}")
+            lines.append(f"  Token expirado: {'Sim' if is_expired else 'Não'}")
+            if token.expires_at:
+                lines.append(f"  Expira em: {token.expires_at.isoformat()}")
+
+            # Testes de API
+            lines.append("")
+            lines.append("  Testes de API:")
+            user_info = get_user_info(token.access_token)
+            t1 = "OK" if user_info else "FALHOU"
+            lines.append(f"    - /users/me (dados usuário): {t1}")
+            if user_info and token.seller_id:
+                items = get_user_items(token.access_token, token.seller_id, status="active", limit=1)
+                t2 = "OK" if items else "FALHOU"
+                lines.append(f"    - /users/{{id}}/items/search (anúncios): {t2}")
+            if token.seller_id:
+                qs = get_questions_search(token.access_token, seller_id=token.seller_id, limit=1)
+                t3 = "OK" if qs else "FALHOU"
+                lines.append(f"    - /questions/search (perguntas): {t3}")
+            test_item = get_item_by_id(token.access_token, "MLB2172237836")
+            t4 = "OK" if (test_item and not test_item.get("error")) else "FALHOU"
+            if test_item and test_item.get("error"):
+                t4 += f" (status={test_item.get('status_code', '?')})"
+            lines.append(f"    - /items/{{id}} (produto público): {t4}")
+    finally:
+        db.close()
+    lines.append("")
+
+    # 3. Teste de busca por termo (sem token e com token)
+    lines.append("-" * 60)
+    lines.append("3. BUSCA POR TERMO (/sites/MLB/search)")
+    lines.append("-" * 60)
+    sr_no = search_public(site_id="MLB", q="fone bluetooth", limit=5, access_token=None)
+    if sr_no and sr_no.get("error"):
+        lines.append(f"  Sem token: FALHOU (status={sr_no.get('status_code', '?')}, msg={sr_no.get('message', '')[:80]})")
+    else:
+        total = sr_no.get("paging", {}).get("total", 0) if sr_no else 0
+        lines.append(f"  Sem token: {'OK' if sr_no and not sr_no.get('error') else 'FALHOU'} (total={total})")
+    token = get_valid_ml_token(user)
+    if token:
+        sr_tok = search_public(site_id="MLB", q="fone bluetooth", limit=5, access_token=token.access_token)
+        if sr_tok and sr_tok.get("error"):
+            lines.append(f"  Com token: FALHOU (status={sr_tok.get('status_code', '?')})")
+        else:
+            total = sr_tok.get("paging", {}).get("total", 0) if sr_tok else 0
+            lines.append(f"  Com token: {'OK' if sr_tok and not sr_tok.get('error') else 'FALHOU'} (total={total})")
+    else:
+        lines.append("  Com token: (conta ML não conectada)")
+    lines.append("")
+
+    # 4. Últimas linhas do log do backend
+    lines.append("-" * 60)
+    lines.append("4. ÚLTIMAS LINHAS DO LOG DO BACKEND")
+    lines.append("-" * 60)
+    if LOG_FILE.exists():
+        try:
+            text = LOG_FILE.read_text(encoding="utf-8", errors="ignore")
+            log_lines = [l for l in text.strip().split("\n") if l.strip()]
+            last = log_lines[-100:] if len(log_lines) > 100 else log_lines
+            for ln in last:
+                lines.append(f"  {ln}")
+            if not last:
+                lines.append("  (log vazio)")
+        except Exception as e:
+            lines.append(f"  Erro ao ler log: {e}")
+    else:
+        lines.append("  (arquivo de log não encontrado)")
+    lines.append("")
+
+    lines.append("=" * 60)
+    lines.append("FIM DO RELATÓRIO - Anexe este arquivo ao solicitar suporte.")
+    lines.append("=" * 60)
+    return "\n".join(lines)
+
+
+@app.get("/api/diagnostic-report", response_class=PlainTextResponse)
+def api_diagnostic_report(user: User = Depends(get_current_user)):
+    """Executa vários testes e retorna relatório em texto para download."""
+    report = _build_diagnostic_report(user)
+    return PlainTextResponse(report, media_type="text/plain; charset=utf-8")
 
 
 @app.get("/api/ml-test-item/{item_id}")

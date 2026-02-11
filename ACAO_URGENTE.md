@@ -2,6 +2,8 @@
 
 **Data:** 09/02/2026 23:30
 
+> **Análise completa da busca de concorrentes:** Veja `ANALISE_API_ML_CONCORRENTES.md` — comparação com projetos GitHub, uso da API pública e opções disponíveis.
+
 ---
 
 ## 🎯 DESCOBRI A CAUSA RAIZ!
