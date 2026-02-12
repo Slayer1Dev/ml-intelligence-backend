@@ -94,6 +94,21 @@
         <div id="diagnostic-results" style="display: none;"></div>
       </div>
 
+      <!-- Telegram Bot (Notificações) -->
+      <div class="card">
+        <h2 style="margin-top: 0;">🔔 Notificações no celular (Telegram)</h2>
+        <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 1rem;">Receba avisos de novas perguntas nos anúncios diretamente no Telegram.</p>
+        <p id="telegram-config-status" style="font-size: 0.9rem; margin-bottom: 0.75rem;"></p>
+        <div id="telegram-config-box" style="display: none;">
+          <p style="font-size: 0.85rem; color: var(--gray); margin-bottom: 0.5rem;">1. Abra o bot no Telegram e envie /start.<br>2. Obtenha seu Chat ID em <a href="https://t.me/userinfobot" target="_blank" rel="noopener">@userinfobot</a> (envie /start).<br>3. Cole o número abaixo e clique em Vincular.</p>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+            <input type="text" id="telegram-chat-id-config" placeholder="Ex: 123456789" style="padding: 0.5rem 0.75rem; border: 1px solid var(--gray-light); border-radius: 8px; width: 180px;">
+            <button type="button" id="btn-link-telegram-config" class="btn-config btn-test">Vincular Telegram</button>
+          </div>
+          <p id="telegram-config-msg" style="font-size: 0.85rem; margin-top: 0.5rem;"></p>
+        </div>
+      </div>
+
       <!-- Teste de API -->
       <div class="card">
         <h2 style="margin-top: 0;">Testar API do Mercado Livre</h2>
@@ -432,6 +447,58 @@
       btn.textContent = 'Testar';
     }
 
+    async function loadTelegramConfig() {
+      try {
+        const res = await authFetch(`${API_BASE}/api/me`);
+        const me = await res.json();
+        const statusEl = document.getElementById('telegram-config-status');
+        const boxEl = document.getElementById('telegram-config-box');
+        if (me && me.telegramLinked) {
+          statusEl.textContent = '✅ Telegram vinculado. Você receberá notificações de novas perguntas.';
+          statusEl.style.color = '#059669';
+          if (boxEl) boxEl.style.display = 'none';
+        } else {
+          statusEl.textContent = 'Telegram não vinculado. Vincule para receber notificações no celular.';
+          statusEl.style.color = 'var(--gray)';
+          if (boxEl) boxEl.style.display = 'block';
+        }
+      } catch (e) {
+        const statusEl = document.getElementById('telegram-config-status');
+        if (statusEl) statusEl.textContent = 'Erro ao carregar status do Telegram.';
+      }
+    }
+
+    async function linkTelegramConfig() {
+      const chatId = (document.getElementById('telegram-chat-id-config')?.value || '').trim();
+      const msgEl = document.getElementById('telegram-config-msg');
+      const btn = document.getElementById('btn-link-telegram-config');
+      if (!chatId) {
+        if (msgEl) { msgEl.textContent = 'Informe o Chat ID.'; msgEl.style.color = '#dc2626'; }
+        return;
+      }
+      btn.disabled = true;
+      if (msgEl) msgEl.textContent = '';
+      try {
+        const res = await authFetch(`${API_BASE}/api/me/telegram`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          if (msgEl) { msgEl.textContent = '✅ Telegram vinculado com sucesso!'; msgEl.style.color = '#059669'; }
+          addLog('Telegram vinculado', 'success');
+          loadTelegramConfig();
+        } else {
+          if (msgEl) { msgEl.textContent = data.detail || 'Erro ao vincular.'; msgEl.style.color = '#dc2626'; }
+          addLog('Erro ao vincular Telegram: ' + (data.detail || ''), 'error');
+        }
+      } catch (e) {
+        if (msgEl) { msgEl.textContent = 'Erro: ' + (e.message || 'Tente novamente.'); msgEl.style.color = '#dc2626'; }
+      }
+      btn.disabled = false;
+    }
+
     async function downloadDiagnosticReport() {
       const btn = document.getElementById('btn-download-report');
       const origText = btn.textContent;
@@ -478,12 +545,14 @@
       updateLogBox();
       
       await loadStatus();
+      await loadTelegramConfig();
 
       document.getElementById('btn-connect').addEventListener('click', connectML);
       document.getElementById('btn-disconnect').addEventListener('click', disconnectML);
       document.getElementById('btn-refresh-status').addEventListener('click', loadStatus);
       document.getElementById('btn-diagnostic').addEventListener('click', runDiagnostic);
       document.getElementById('btn-download-report').addEventListener('click', downloadDiagnosticReport);
+      document.getElementById('btn-link-telegram-config')?.addEventListener('click', linkTelegramConfig);
       document.getElementById('btn-test-api').addEventListener('click', testAPI);
       document.getElementById('btn-clear-logs').addEventListener('click', () => {
         logs = [];

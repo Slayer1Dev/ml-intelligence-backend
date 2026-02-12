@@ -69,6 +69,42 @@ async def _debug_exception_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 
+def _sync_all_users_questions():
+    """Polling: busca perguntas não respondidas de todos os usuários a cada 30min."""
+    logger.info("Polling de perguntas: iniciando...")
+    db = SessionLocal()
+    try:
+        tokens = db.query(MlToken).all()
+        total_synced = 0
+        for ml_token in tokens:
+            user = db.query(User).filter(User.id == ml_token.user_id).first()
+            if not user:
+                continue
+            token = get_valid_ml_token(user)
+            if not token or not token.seller_id:
+                continue
+            result = get_questions_search(token.access_token, seller_id=token.seller_id, limit=50, offset=0)
+            if not result:
+                continue
+            for q in result.get("questions", []):
+                status = (q.get("status") or "").upper()
+                if status in ("ANSWERED", "BANNED", "DELETED", "DISABLED"):
+                    continue
+                question_id = str(q.get("id") or "").strip()
+                if not question_id:
+                    continue
+                if db.query(PendingQuestion).filter(PendingQuestion.user_id == user.id, PendingQuestion.question_id == question_id).first():
+                    continue
+                _process_ml_question_webhook(question_id, user.id)
+                total_synced += 1
+        if total_synced:
+            logger.info("Polling de perguntas: %d novas sincronizadas", total_synced)
+    except Exception as e:
+        logger.exception("Erro no polling de perguntas: %s", e)
+    finally:
+        db.close()
+
+
 @app.on_event("startup")
 def startup():
     logger.info("Backend iniciado. Logs disponíveis em logs/backend.log e no painel Admin.")
@@ -76,6 +112,16 @@ def startup():
         init_db()
     except Exception as e:
         logger.exception(f"Erro ao inicializar banco: {e}")
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.interval import IntervalTrigger
+        _scheduler = BackgroundScheduler()
+        _scheduler.add_job(_sync_all_users_questions, trigger=IntervalTrigger(minutes=30), id="sync_questions", replace_existing=True)
+        _scheduler.start()
+        app.state._question_scheduler = _scheduler
+        logger.info("Polling de perguntas: ativo (a cada 30 min)")
+    except ImportError:
+        logger.warning("APScheduler não instalado. Polling de perguntas desabilitado.")
 
 
 app.add_middleware(
@@ -732,105 +778,139 @@ def ml_diagnostic(user: User = Depends(get_current_user)):
 
 
 def _build_diagnostic_report(user: User) -> str:
-    """Gera relatório de diagnóstico completo em texto para download."""
+    """Gera relatório de diagnóstico EXTREMO em texto para download — testa todos os fluxos possíveis."""
     from datetime import datetime, timedelta
     lines = []
-    lines.append("=" * 60)
-    lines.append("MERCADO INSIGHTS - RELATÓRIO DE DIAGNÓSTICO")
-    lines.append("=" * 60)
+    lines.append("=" * 70)
+    lines.append("MERCADO INSIGHTS - RELATÓRIO DE DIAGNÓSTICO EXTREMO")
+    lines.append("=" * 70)
     lines.append(f"Data/Hora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (UTC)")
     lines.append(f"User ID: {user.id}")
     lines.append("")
 
-    # 1. Variáveis de ambiente (presença apenas, sem valores sensíveis)
-    lines.append("-" * 60)
+    # 1. Variáveis de ambiente
+    lines.append("-" * 70)
     lines.append("1. VARIÁVEIS DE AMBIENTE")
-    lines.append("-" * 60)
+    lines.append("-" * 70)
     env_vars = [
         "ML_APP_ID", "ML_SECRET", "ML_REDIRECT_URI",
         "CLERK_SECRET_KEY", "CLERK_PUBLISHABLE_KEY",
         "STRIPE_SECRET_KEY", "MP_ACCESS_TOKEN", "MP_WEBHOOK_SECRET",
-        "OPENAI_API_KEY", "DATABASE_URL",
+        "OPENAI_API_KEY", "DATABASE_URL", "TELEGRAM_BOT_TOKEN",
+        "FRONTEND_URL", "ALLOWED_ORIGINS",
     ]
     for var in env_vars:
         val = os.getenv(var)
-        status = "OK (configurado)" if val and len(str(val).strip()) > 0 else "AUSENTE ou vazio"
+        status = "OK" if val and len(str(val).strip()) > 0 else "AUSENTE"
         lines.append(f"  {var}: {status}")
     lines.append("")
 
-    # 2. Diagnóstico ML (conexão, token, testes)
-    lines.append("-" * 60)
+    # 2. Conexão ML e testes de API
+    lines.append("-" * 70)
     lines.append("2. CONEXÃO MERCADO LIVRE")
-    lines.append("-" * 60)
+    lines.append("-" * 70)
     db = SessionLocal()
+    token = None
     try:
         token = db.query(MlToken).filter(MlToken.user_id == user.id).first()
         if not token:
             lines.append("  Status: NENHUMA CONTA ML CONECTADA")
-            lines.append("  Ação: Conecte sua conta em Config > Mercado Livre")
         else:
             now = datetime.utcnow()
             is_expired = token.expires_at and token.expires_at <= now
-            lines.append(f"  Status: Conectado")
-            lines.append(f"  Seller ID: {token.seller_id}")
+            lines.append(f"  Status: Conectado | Seller ID: {token.seller_id}")
             lines.append(f"  Token expirado: {'Sim' if is_expired else 'Não'}")
-            if token.expires_at:
-                lines.append(f"  Expira em: {token.expires_at.isoformat()}")
 
-            # Testes de API
             lines.append("")
             lines.append("  Testes de API:")
             user_info = get_user_info(token.access_token)
-            t1 = "OK" if user_info else "FALHOU"
-            lines.append(f"    - /users/me (dados usuário): {t1}")
-            if user_info and token.seller_id:
-                items = get_user_items(token.access_token, token.seller_id, status="active", limit=1)
-                t2 = "OK" if items else "FALHOU"
-                lines.append(f"    - /users/{{id}}/items/search (anúncios): {t2}")
+            lines.append(f"    /users/me: {'OK' if user_info else 'FALHOU'}")
             if token.seller_id:
-                qs = get_questions_search(token.access_token, seller_id=token.seller_id, limit=1)
-                t3 = "OK" if qs else "FALHOU"
-                lines.append(f"    - /questions/search (perguntas): {t3}")
-            test_item = get_item_by_id(token.access_token, "MLB2172237836")
-            t4 = "OK" if (test_item and not test_item.get("error")) else "FALHOU"
-            if test_item and test_item.get("error"):
-                t4 += f" (status={test_item.get('status_code', '?')})"
-            lines.append(f"    - /items/{{id}} (produto público): {t4}")
+                for st in ["active", "paused", "closed", "pending", "under_review"]:
+                    r = get_user_items(token.access_token, token.seller_id, status=st, limit=5)
+                    cnt = r.get("paging", {}).get("total", 0) if r else "ERRO"
+                    err = " (erro)" if r is None else ""
+                    lines.append(f"    /items/search?status={st}: total={cnt}{err}")
+                qs = get_questions_search(token.access_token, seller_id=token.seller_id, limit=5)
+                qcnt = len(qs.get("questions", [])) if qs else "ERRO"
+                lines.append(f"    /questions/search: {qcnt} perguntas")
+            test_ids = ["MLB4443868923", "MLB1000"]
+            for tid in test_ids:
+                it = get_item_by_id(token.access_token, tid)
+                ok = it and not it.get("error")
+                sc = it.get("status_code", "?") if it and it.get("error") else "200"
+                lines.append(f"    /items/{tid}: {'OK' if ok else f'FALHOU ({sc})'}")
     finally:
         db.close()
-    lines.append("")
 
-    # 3. Teste de busca por termo (sem token e com token)
-    lines.append("-" * 60)
-    lines.append("3. BUSCA POR TERMO (/sites/MLB/search)")
-    lines.append("-" * 60)
-    sr_no = search_public(site_id="MLB", q="fone bluetooth", limit=5, access_token=None)
-    if sr_no and sr_no.get("error"):
-        lines.append(f"  Sem token: FALHOU (status={sr_no.get('status_code', '?')}, msg={sr_no.get('message', '')[:80]})")
-    else:
-        total = sr_no.get("paging", {}).get("total", 0) if sr_no else 0
-        lines.append(f"  Sem token: {'OK' if sr_no and not sr_no.get('error') else 'FALHOU'} (total={total})")
-    token = get_valid_ml_token(user)
+    lines.append("")
+    lines.append("-" * 70)
+    lines.append("3. BUSCA POR TERMO (/sites/MLB/search) — todos os cenários")
+    lines.append("-" * 70)
+    for q, sort in [("fone bluetooth", None), ("notebook", "price_asc"), ("celular", "sales_desc")]:
+        sr = search_public(site_id="MLB", q=q, limit=3, sort=sort, access_token=None)
+        ok = sr and not sr.get("error")
+        sc = sr.get("status_code", "?") if sr and sr.get("error") else "200"
+        total = sr.get("paging", {}).get("total", 0) if sr and not sr.get("error") else 0
+        lines.append(f"  q={q!r} sort={sort}: {'OK' if ok else 'FALHOU'} (status={sc}, total={total})")
     if token:
-        sr_tok = search_public(site_id="MLB", q="fone bluetooth", limit=5, access_token=token.access_token)
-        if sr_tok and sr_tok.get("error"):
-            lines.append(f"  Com token: FALHOU (status={sr_tok.get('status_code', '?')})")
-        else:
-            total = sr_tok.get("paging", {}).get("total", 0) if sr_tok else 0
-            lines.append(f"  Com token: {'OK' if sr_tok and not sr_tok.get('error') else 'FALHOU'} (total={total})")
-    else:
-        lines.append("  Com token: (conta ML não conectada)")
-    lines.append("")
+        sr_t = search_public(site_id="MLB", q="fone bluetooth", limit=3, access_token=token.access_token)
+        ok = sr_t and not sr_t.get("error")
+        lines.append(f"  (com token) q='fone bluetooth': {'OK' if ok else 'FALHOU'}")
 
-    # 4. Últimas linhas do log do backend
-    lines.append("-" * 60)
-    lines.append("4. ÚLTIMAS LINHAS DO LOG DO BACKEND")
-    lines.append("-" * 60)
+    lines.append("")
+    lines.append("-" * 70)
+    lines.append("4. PERGUNTAS — fluxo e pendentes")
+    lines.append("-" * 70)
+    token = get_valid_ml_token(user)
+    if token and token.seller_id:
+        qs = get_questions_search(token.access_token, seller_id=token.seller_id, limit=20)
+        if qs:
+            questions = qs.get("questions", [])
+            unanswered = [q for q in questions if (q.get("status") or "").upper() not in ("ANSWERED", "BANNED", "DELETED", "DISABLED")]
+            lines.append(f"  Perguntas retornadas: {len(questions)}")
+            lines.append(f"  Não respondidas: {len(unanswered)}")
+        else:
+            lines.append("  FALHOU ao buscar perguntas")
+    else:
+        lines.append("  (conta ML não conectada)")
+    db = SessionLocal()
+    try:
+        pend = db.query(PendingQuestion).filter(PendingQuestion.user_id == user.id, PendingQuestion.status == "pending").count()
+        lines.append(f"  Pendentes aguardando aprovação no sistema: {pend}")
+    finally:
+        db.close()
+
+    lines.append("")
+    lines.append("-" * 70)
+    lines.append("5. POLLING E WEBHOOK DE PERGUNTAS")
+    lines.append("-" * 70)
+    try:
+        from apscheduler.schedulers.base import BaseScheduler
+        lines.append("  APScheduler: instalado (polling a cada 30 min)")
+    except ImportError:
+        lines.append("  APScheduler: NÃO instalado - pip install apscheduler para polling automático")
+    lines.append("  Sync ao abrir página: sim")
+    lines.append("  Webhook ML (tópico questions): configure no portal ML para tempo real")
+
+    lines.append("")
+    lines.append("-" * 70)
+    lines.append("6. TELEGRAM E NOTIFICAÇÕES")
+    lines.append("-" * 70)
+    telegram_ok = bool(os.getenv("TELEGRAM_BOT_TOKEN", "").strip())
+    chat_id = getattr(user, "telegram_chat_id", None)
+    lines.append(f"  TELEGRAM_BOT_TOKEN: {'OK' if telegram_ok else 'AUSENTE'}")
+    lines.append(f"  Usuário telegram_chat_id: {'Vinculado' if chat_id else 'Não vinculado'}")
+
+    lines.append("")
+    lines.append("-" * 70)
+    lines.append("7. ÚLTIMAS 150 LINHAS DO LOG DO BACKEND")
+    lines.append("-" * 70)
     if LOG_FILE.exists():
         try:
             text = LOG_FILE.read_text(encoding="utf-8", errors="ignore")
             log_lines = [l for l in text.strip().split("\n") if l.strip()]
-            last = log_lines[-100:] if len(log_lines) > 100 else log_lines
+            last = log_lines[-150:] if len(log_lines) > 150 else log_lines
             for ln in last:
                 lines.append(f"  {ln}")
             if not last:
@@ -839,11 +919,11 @@ def _build_diagnostic_report(user: User) -> str:
             lines.append(f"  Erro ao ler log: {e}")
     else:
         lines.append("  (arquivo de log não encontrado)")
-    lines.append("")
 
-    lines.append("=" * 60)
-    lines.append("FIM DO RELATÓRIO - Anexe este arquivo ao solicitar suporte.")
-    lines.append("=" * 60)
+    lines.append("")
+    lines.append("=" * 70)
+    lines.append("FIM DO RELATÓRIO — Anexe ao solicitar suporte.")
+    lines.append("=" * 70)
     return "\n".join(lines)
 
 

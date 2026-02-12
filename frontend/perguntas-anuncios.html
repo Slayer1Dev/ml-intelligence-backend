@@ -307,6 +307,12 @@
         updateTelegramUI(me);
         document.getElementById('btn-link-telegram')?.addEventListener('click', linkTelegram);
         loadPending();
+        // Sync automático ao abrir a página (complementa o polling de 30min no backend)
+        try {
+          var r = await authFetch(API_BASE + '/api/ml/questions/sync', { method: 'POST' });
+          var d = await r.json();
+          if (r.ok && d.synced > 0) loadPending();
+        } catch (e) { /* silencioso */ }
         var btnSync = document.getElementById('btn-sync-questions');
         if (btnSync) {
           btnSync.addEventListener('click', async function () {

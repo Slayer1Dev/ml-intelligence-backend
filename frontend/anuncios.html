@@ -120,7 +120,8 @@
           <select id="status-filter" style="padding: 0.5rem; border: 1px solid var(--gray-light); border-radius: 4px;">
             <option value="all">Todos</option>
             <option value="active">Ativos</option>
-            <option value="paused">Pausados / Inativo para revisar</option>
+            <option value="paused">Pausados</option>
+            <option value="pending">Inativo para revisar</option>
             <option value="closed">Fechados</option>
           </select>
           <span id="total-count" style="margin-left: auto; color: var(--gray);"></span>
@@ -179,6 +180,7 @@
         'closed': 'Fechado',
         'payment_required': 'Pagamento Pendente',
         'under_review': 'Inativo para revisar',
+        'pending': 'Inativo para revisar',
       };
       return statusMap[status] || (status ? String(status) : 'unknown');
     }
