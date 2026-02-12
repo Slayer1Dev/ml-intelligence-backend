@@ -97,13 +97,14 @@
       <!-- Telegram Bot (Notificações) -->
       <div class="card">
         <h2 style="margin-top: 0;">🔔 Notificações no celular (Telegram)</h2>
-        <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 1rem;">Receba avisos de novas perguntas nos anúncios diretamente no Telegram.</p>
+        <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 1rem;">Receba avisos de novas perguntas nos anúncios diretamente no Telegram. O Chat ID é salvo no banco de dados.</p>
         <p id="telegram-config-status" style="font-size: 0.9rem; margin-bottom: 0.75rem;"></p>
-        <div id="telegram-config-box" style="display: none;">
-          <p style="font-size: 0.85rem; color: var(--gray); margin-bottom: 0.5rem;">1. Abra o bot no Telegram e envie /start.<br>2. Obtenha seu Chat ID em <a href="https://t.me/userinfobot" target="_blank" rel="noopener">@userinfobot</a> (envie /start).<br>3. Cole o número abaixo e clique em Vincular.</p>
+        <div id="telegram-config-box">
+          <p style="font-size: 0.85rem; color: var(--gray); margin-bottom: 0.5rem;">1. Abra o bot no Telegram e envie /start.<br>2. Obtenha seu Chat ID em <a href="https://t.me/userinfobot" target="_blank" rel="noopener">@userinfobot</a> (envie /start).<br>3. Cole o número abaixo e clique em Vincular ou Atualizar.</p>
           <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
             <input type="text" id="telegram-chat-id-config" placeholder="Ex: 123456789" style="padding: 0.5rem 0.75rem; border: 1px solid var(--gray-light); border-radius: 8px; width: 180px;">
-            <button type="button" id="btn-link-telegram-config" class="btn-config btn-test">Vincular Telegram</button>
+            <button type="button" id="btn-link-telegram-config" class="btn-config btn-test">Vincular / Atualizar</button>
+            <button type="button" id="btn-test-telegram" class="btn-config btn-test" style="background: #0d9488; color: white;">Enviar mensagem de teste</button>
           </div>
           <p id="telegram-config-msg" style="font-size: 0.85rem; margin-top: 0.5rem;"></p>
         </div>
@@ -452,20 +453,42 @@
         const res = await authFetch(`${API_BASE}/api/me`);
         const me = await res.json();
         const statusEl = document.getElementById('telegram-config-status');
-        const boxEl = document.getElementById('telegram-config-box');
+        const inputEl = document.getElementById('telegram-chat-id-config');
         if (me && me.telegramLinked) {
           statusEl.textContent = '✅ Telegram vinculado. Você receberá notificações de novas perguntas.';
           statusEl.style.color = '#059669';
-          if (boxEl) boxEl.style.display = 'none';
+          if (inputEl && me.telegramChatId) inputEl.value = me.telegramChatId;
         } else {
-          statusEl.textContent = 'Telegram não vinculado. Vincule para receber notificações no celular.';
+          statusEl.textContent = 'Telegram não vinculado. Informe seu Chat ID e vincule.';
           statusEl.style.color = 'var(--gray)';
-          if (boxEl) boxEl.style.display = 'block';
+          if (inputEl) inputEl.value = '';
         }
       } catch (e) {
         const statusEl = document.getElementById('telegram-config-status');
         if (statusEl) statusEl.textContent = 'Erro ao carregar status do Telegram.';
       }
+    }
+
+    async function testTelegramMessage() {
+      const btn = document.getElementById('btn-test-telegram');
+      const msgEl = document.getElementById('telegram-config-msg');
+      btn.disabled = true;
+      if (msgEl) msgEl.textContent = 'Enviando...';
+      try {
+        const res = await authFetch(`${API_BASE}/api/telegram/test`, { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+          if (msgEl) { msgEl.textContent = '✅ ' + (data.message || 'Mensagem enviada!'); msgEl.style.color = '#059669'; }
+          addLog('Mensagem de teste Telegram enviada', 'success');
+        } else {
+          const err = data.detail || data.message || 'Erro ao enviar';
+          if (msgEl) { msgEl.textContent = '❌ ' + err; msgEl.style.color = '#dc2626'; }
+          addLog('Erro teste Telegram: ' + err, 'error');
+        }
+      } catch (e) {
+        if (msgEl) { msgEl.textContent = '❌ ' + (e.message || 'Erro de conexão'); msgEl.style.color = '#dc2626'; }
+      }
+      btn.disabled = false;
     }
 
     async function linkTelegramConfig() {
@@ -553,6 +576,7 @@
       document.getElementById('btn-diagnostic').addEventListener('click', runDiagnostic);
       document.getElementById('btn-download-report').addEventListener('click', downloadDiagnosticReport);
       document.getElementById('btn-link-telegram-config')?.addEventListener('click', linkTelegramConfig);
+      document.getElementById('btn-test-telegram')?.addEventListener('click', testTelegramMessage);
       document.getElementById('btn-test-api').addEventListener('click', testAPI);
       document.getElementById('btn-clear-logs').addEventListener('click', () => {
         logs = [];

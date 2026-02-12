@@ -116,10 +116,10 @@ def startup():
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.triggers.interval import IntervalTrigger
         _scheduler = BackgroundScheduler()
-        _scheduler.add_job(_sync_all_users_questions, trigger=IntervalTrigger(minutes=30), id="sync_questions", replace_existing=True)
+        _scheduler.add_job(_sync_all_users_questions, trigger=IntervalTrigger(minutes=10), id="sync_questions", replace_existing=True)
         _scheduler.start()
         app.state._question_scheduler = _scheduler
-        logger.info("Polling de perguntas: ativo (a cada 30 min)")
+        logger.info("Polling de perguntas: ativo (a cada 10 min)")
     except ImportError:
         logger.warning("APScheduler não instalado. Polling de perguntas desabilitado.")
 
@@ -495,11 +495,13 @@ def get_me(user: User = Depends(get_current_user)):
     # #region agent log
     _debug_log("api_me_ok", {"user_id": user.id, "email": (user.email or "")[:20], "isAdmin": is_admin(user.email)}, "H3")
     # #endregion
+    chat_id = getattr(user, "telegram_chat_id", None)
     return {
         "plan": user.plan,
         "email": user.email,
         "isAdmin": is_admin(user.email),
-        "telegramLinked": bool(getattr(user, "telegram_chat_id", None)),
+        "telegramLinked": bool(chat_id),
+        "telegramChatId": chat_id if chat_id else None,
     }
 
 
@@ -523,6 +525,17 @@ def link_telegram(data: TelegramLinkInput, user: User = Depends(get_current_user
         return {"ok": True, "message": "Telegram vinculado. Você receberá notificações de novas perguntas."}
     finally:
         db.close()
+
+
+@app.post("/api/telegram/test")
+def telegram_test_message(user: User = Depends(get_current_user)):
+    """Envia mensagem de teste no Telegram para verificar a conexão."""
+    chat_id = getattr(user, "telegram_chat_id", None)
+    from app.services.notification_service import send_telegram_test_message
+    ok, msg = send_telegram_test_message(chat_id or "")
+    if ok:
+        return {"ok": True, "message": msg}
+    raise HTTPException(status_code=400, detail=msg)
 
 
 @app.get("/api/debug-admin")
@@ -887,7 +900,7 @@ def _build_diagnostic_report(user: User) -> str:
     lines.append("-" * 70)
     try:
         from apscheduler.schedulers.base import BaseScheduler
-        lines.append("  APScheduler: instalado (polling a cada 30 min)")
+        lines.append("  APScheduler: instalado (polling a cada 10 min)")
     except ImportError:
         lines.append("  APScheduler: NÃO instalado - pip install apscheduler para polling automático")
     lines.append("  Sync ao abrir página: sim")
@@ -1630,6 +1643,39 @@ def ml_questions_metrics(user: User = Depends(paid_guard)):
         "avg_time_to_answer_seconds": round(avg_seconds, 0) if avg_seconds is not None else None,
         "avg_time_to_answer_hours": round(avg_seconds / 3600, 2) if avg_seconds is not None else None,
     }
+
+
+@app.get("/api/ml/questions/history")
+def ml_questions_history(limit: int = 50, offset: int = 0, user: User = Depends(paid_guard)):
+    """Histórico de perguntas e respostas já publicadas, armazenadas no banco."""
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(QuestionAnswerFeedback)
+            .filter(QuestionAnswerFeedback.user_id == user.id)
+            .order_by(QuestionAnswerFeedback.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+        total = db.query(QuestionAnswerFeedback).filter(QuestionAnswerFeedback.user_id == user.id).count()
+        return {
+            "total": total,
+            "items": [
+                {
+                    "id": r.id,
+                    "question_id": r.question_id,
+                    "item_id": r.item_id,
+                    "pergunta_texto": r.pergunta_texto,
+                    "resposta_ia_sugerida": r.resposta_ia_sugerida,
+                    "resposta_publicada": r.resposta_final_publicada,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                }
+                for r in rows
+            ],
+        }
+    finally:
+        db.close()
 
 
 @app.post("/api/ml/questions/sync")

@@ -92,6 +92,13 @@
         </div>
         <p style="font-size: 0.85rem; color: var(--gray); margin: -0.5rem 0 1rem 0;">Se as perguntas não aparecerem sozinhas (webhook), use este botão para buscar no Mercado Livre.</p>
         <div id="pending-list"></div>
+
+        <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--gray-light);">
+          <h2 style="font-size: 1.1rem; margin: 0 0 0.75rem 0;">Histórico de perguntas e respostas</h2>
+          <p style="font-size: 0.85rem; color: var(--gray); margin-bottom: 1rem;">Perguntas já respondidas e publicadas, armazenadas no banco para consulta.</p>
+          <button type="button" id="btn-load-history" class="button" style="font-size: 0.9rem; margin-bottom: 1rem;">Carregar histórico</button>
+          <div id="history-list"></div>
+        </div>
       </div>
     </main>
   </div>
@@ -130,6 +137,37 @@
         document.getElementById('pending-container').style.display = 'none';
         return false;
       }
+    }
+
+    async function loadHistory() {
+      const listEl = document.getElementById('history-list');
+      if (!listEl) return;
+      listEl.innerHTML = '<p>Carregando histórico...</p>';
+      const btn = document.getElementById('btn-load-history');
+      if (btn) btn.disabled = true;
+      try {
+        const res = await authFetch(API_BASE + '/api/ml/questions/history?limit=50');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Erro');
+        if (!data.items || !data.items.length) {
+          listEl.innerHTML = '<div class="empty-state">Nenhuma pergunta respondida ainda. As perguntas que você aprovar e publicar aparecerão aqui.</div>';
+          return;
+        }
+        listEl.innerHTML = data.items.map(function (h) {
+          const created = h.created_at ? new Date(h.created_at).toLocaleString('pt-BR') : '';
+          return (
+            '<div class="pending-card" style="border-color: #e5e7eb;">' +
+              (h.item_id ? '<div class="item-title">Anúncio: ' + (h.item_id) + '</div>' : '') +
+              '<div class="pergunta"><strong>Pergunta:</strong> ' + escapeHtml(h.pergunta_texto || '') + '</div>' +
+              '<div class="resposta-sugerida" style="background:#f0fdf4; border-left: 3px solid #059669;"><strong>Resposta publicada:</strong><br>' + escapeHtml(h.resposta_publicada || '') + '</div>' +
+              '<div class="meta">' + created + '</div>' +
+            '</div>'
+          );
+        }).join('');
+      } catch (e) {
+        listEl.innerHTML = '<div class="empty-state">Erro ao carregar: ' + escapeHtml(e.message || 'Erro desconhecido') + '</div>';
+      }
+      if (btn) btn.disabled = false;
     }
 
     async function loadPending() {
@@ -313,6 +351,7 @@
           var d = await r.json();
           if (r.ok && d.synced > 0) loadPending();
         } catch (e) { /* silencioso */ }
+        document.getElementById('btn-load-history')?.addEventListener('click', loadHistory);
         var btnSync = document.getElementById('btn-sync-questions');
         if (btnSync) {
           btnSync.addEventListener('click', async function () {

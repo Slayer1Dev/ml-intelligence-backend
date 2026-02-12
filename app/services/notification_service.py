@@ -19,6 +19,28 @@ EMAIL_SMTP_USER = os.getenv("EMAIL_SMTP_USER")
 EMAIL_SMTP_PASSWORD = os.getenv("EMAIL_SMTP_PASSWORD")
 
 
+def send_telegram_test_message(chat_id: str):
+    """Envia mensagem de teste no Telegram. Retorna (sucesso, mensagem)."""
+    if not TELEGRAM_BOT_TOKEN:
+        return False, "TELEGRAM_BOT_TOKEN não configurado no servidor."
+    if not chat_id or not str(chat_id).strip():
+        return False, "Chat ID não vinculado. Vincule primeiro na página de configurações."
+    text = "✅ Mercado Insights — Teste de notificação\n\nSua conexão com o Telegram está funcionando corretamente!"
+    try:
+        resp = requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+            json={"chat_id": chat_id.strip(), "text": text, "disable_web_page_preview": True},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            return True, "Mensagem enviada! Verifique seu Telegram."
+        err = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+        msg = err.get("description", resp.text[:200]) or f"Erro {resp.status_code}"
+        return False, msg
+    except Exception as e:
+        return False, str(e)
+
+
 def send_question_notification(
     chat_id: str,
     pergunta_preview: str,
