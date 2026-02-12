@@ -348,11 +348,11 @@
           
           let paginationHTML = '';
           if (currentPage > 1) {
-            paginationHTML += `<button onclick="loadAnuncios('${status}', ${offset - limit})" style="padding: 0.5rem 1rem; margin: 0 0.25rem; border: 1px solid var(--gray-light); background: white; border-radius: 4px; cursor: pointer;">Anterior</button>`;
+            paginationHTML += `<button type="button" onclick="loadAnuncios('${status}', ${offset - limit})" class="button" style="margin: 0 0.25rem;">Anterior</button>`;
           }
           paginationHTML += `<span style="margin: 0 1rem;">Página ${currentPage} de ${totalPages}</span>`;
           if (currentPage < totalPages) {
-            paginationHTML += `<button onclick="loadAnuncios('${status}', ${offset + limit})" style="padding: 0.5rem 1rem; margin: 0 0.25rem; border: 1px solid var(--gray-light); background: white; border-radius: 4px; cursor: pointer;">Próxima</button>`;
+            paginationHTML += `<button type="button" onclick="loadAnuncios('${status}', ${offset + limit})" class="button" style="margin: 0 0.25rem;">Próxima</button>`;
           }
           paginationEl.innerHTML = paginationHTML;
         } else {

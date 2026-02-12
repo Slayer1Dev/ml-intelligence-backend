@@ -12,13 +12,13 @@
   <style>
     .search-box { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
     .search-box input { flex: 1; min-width: 200px; padding: 0.75rem 1rem; border: 1px solid var(--gray-light); border-radius: 8px; font-size: 1rem; }
-    .search-box input:focus { outline: none; border-color: var(--primary); }
+    .search-box input:focus { outline: none; border-color: var(--blue-primary); }
     .btn-concorrentes {
-      padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 600; cursor: pointer; border: none;
-      background: var(--blue-primary); color: white; font-size: 0.95rem;
+      padding: 0.6rem 1.25rem; border-radius: 10px; font-weight: 600; cursor: pointer; border: none;
+      background: var(--blue-primary); color: var(--white); font-size: 0.95rem; font-family: inherit;
       transition: transform 0.2s, box-shadow 0.2s;
     }
-    .btn-concorrentes:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(30, 64, 175, 0.35); }
+    .btn-concorrentes:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(30, 64, 175, 0.35); background: var(--blue-dark); }
     .btn-concorrentes:active { transform: translateY(0); }
     .btn-concorrentes:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
     .compare-section { background: var(--blue-light, #eff6ff); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
@@ -26,9 +26,9 @@
     .result-row:last-child { border-bottom: none; }
     .result-row.mine { background: rgba(30, 64, 175, 0.08); border-radius: 8px; margin: 0.25rem 0; }
     .result-row .thumb { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; }
-    .result-row .pos { font-weight: 700; color: var(--primary); min-width: 2rem; }
+    .result-row .pos { font-weight: 700; color: var(--blue-primary); min-width: 2rem; }
     .result-row .info { flex: 1; }
-    .result-row .price { font-weight: 600; color: var(--primary); }
+    .result-row .price { font-weight: 600; color: var(--blue-primary); }
     .badge { font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px; background: #22c55e; color: white; }
   </style>
 </head>
