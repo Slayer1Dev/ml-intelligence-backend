@@ -92,3 +92,12 @@
 - **Polling:** APScheduler sincroniza perguntas a cada 10 min
 - **Webhook ML:** Tópico "Questions" configurado no portal ML
 - **Telegram:** Usuário deve enviar /start ao bot antes de vincular
+
+---
+
+## 6. Revisão técnica (Codex)
+
+O relatório **RELATORIO_REVISAO_TECNICA.md** documenta pontos críticos de segurança e robustez:
+
+- **P0:** Isolamento de jobs por usuário; CORS; verificação de assinatura no webhook ML
+- **P1:** Refatoração de `main.py`; persistência de `user_settings`; tratamento de exceções

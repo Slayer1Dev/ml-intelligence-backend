@@ -14,9 +14,6 @@
     .metric-value { font-size: 1.6rem; font-weight: 700; color: var(--blue-primary); margin-top: 0.25rem; }
     .metric-label { color: var(--gray); font-size: 0.9rem; }
     .chart-card { padding: 1.5rem; }
-    .tab-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-    .tab-btn { padding: 0.5rem 1rem; border: 1px solid var(--gray-light); background: #fff; border-radius: 6px; cursor: pointer; }
-    .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
     .cost-input { width: 70px; padding: 0.3rem; }
     #items-table td, #items-table th { padding: 0.5rem; font-size: 0.9rem; }
     .btn-primary-actions {
@@ -38,8 +35,8 @@
       box-shadow: 0 4px 12px rgba(30, 64, 175, 0.35);
     }
     .btn-primary-actions:active { transform: translateY(0); }
-    .btn-primary-actions.btn-insights { background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%); }
-    .btn-primary-actions.btn-insights:hover { box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4); }
+    .btn-primary-actions.btn-insights { background: var(--yellow); color: var(--black); }
+    .btn-primary-actions.btn-insights:hover { background: var(--yellow-hover); box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4); }
   </style>
 </head>
 <body class="app">
@@ -82,7 +79,7 @@
         <div id="ml-not-connected" class="card" style="display: none;">
           <p>Conecte sua conta do Mercado Livre para carregar os dados automaticamente.</p>
           <div style="margin-top: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
-            <button type="button" id="btn-conectar-ml-page" class="button" style="cursor: pointer; border: none;">Conectar Mercado Livre</button>
+            <button type="button" id="btn-conectar-ml-page" class="button">Conectar Mercado Livre</button>
             <a href="dashboard.html" class="button" style="text-decoration: none;">Ir para Dashboard</a>
           </div>
         </div>
@@ -197,7 +194,7 @@
               <tbody></tbody>
             </table>
           </div>
-          <button type="button" id="btn-save-costs" class="button" style="margin-top: 1rem;">Salvar alterações</button>
+          <button type="button" id="btn-save-costs" class="button" style="margin-top: 1rem; display: none;">Salvar alterações</button>
         </div>
 
         <div id="ai-insights-box" class="card" style="margin-top: 1.5rem; display: none;">

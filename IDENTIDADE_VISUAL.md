@@ -67,11 +67,13 @@
 
 ### Botões
 
-| Tipo | Estilo |
-|------|--------|
-| **Primário (CTA)** | Fundo `#fbbf24`, texto preto, border-radius 10–12px |
-| **Secundário** | Fundo `#dbeafe`, texto `#1e40af` |
-| **Outline** | Borda azul, texto azul, fundo transparente |
+| Classe | Uso | Estilo |
+|--------|-----|--------|
+| `.btn-primary` | CTA principal | Fundo amarelo, texto preto |
+| `.btn-secondary` | CTA secundário | Fundo azul claro, texto azul |
+| `.button` | Ações gerais (Conectar, Buscar, Salvar) | Fundo azul, texto branco |
+| `.tab-btn` | Abas (ex: Painel Financeiro) | Inativo: borda cinza, texto preto; Ativo: fundo azul, texto branco |
+| `.btn-outline` | Ações discretas | Borda azul, texto azul |
 
 ### Cards
 

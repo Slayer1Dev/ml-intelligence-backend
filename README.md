@@ -2,7 +2,7 @@
 
 Ferramentas inteligentes para quem vende no Mercado Livre.
 
-> Documentação: [PROJECT-SUMMARY.md](PROJECT-SUMMARY.md) | [IDENTIDADE_VISUAL.md](IDENTIDADE_VISUAL.md)
+> Documentação: [DOCUMENTACAO.md](DOCUMENTACAO.md) | [PROJECT-SUMMARY.md](PROJECT-SUMMARY.md)
 
 ## Rodar localmente
 
