@@ -18,6 +18,7 @@
 - **IA Assistente** — Perguntas sobre vendas e gerador de respostas para clientes
 - **Notificações Telegram** — Avisos de novas perguntas no celular
 - **Integração Mercado Pago** — Assinaturas Pro
+- **Assinatura e Pagamentos** — Status do plano, histórico, cancelar/assinar
 - **Admin** — Métricas, usuários, planos, assinaturas, logs, audit logs
 
 **Stack:** Backend FastAPI (Python), frontend HTML/JS estático, Clerk (auth), PostgreSQL, deploy Railway.
@@ -85,7 +86,10 @@ ml-intelligence-backend/
 | POST | /api/ml/questions/sync | Sincronizar perguntas do ML |
 | POST | /api/telegram/test | Enviar mensagem de teste |
 | GET | /api/diagnostic-report | Relatório de diagnóstico (.txt) |
-| POST | /api/ml-webhook | Webhook ML (tópico questions) |
+| POST | /api/ml-webhook | Webhook ML (tópico questions, idempotente) |
+| GET | /api/billing/status | Status da assinatura do usuário |
+| GET | /api/billing/history | Histórico de assinaturas |
+| POST | /api/billing/cancel | Cancelar assinatura ativa |
 
 ---
 

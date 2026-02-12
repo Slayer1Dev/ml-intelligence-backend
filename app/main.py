@@ -52,11 +52,16 @@ if not any(isinstance(h, logging.FileHandler) and getattr(h, "baseFilename", "")
     logger.addHandler(fh)
 
 # ------------------------------------------------------------------
-# App & CORS (auth já carrega dotenv)
+# App & CORS
 # ------------------------------------------------------------------
-# Em produção: defina ALLOWED_ORIGINS no Railway (ex: https://seu-app.railway.app)
-_CORS_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
-_CORS_LIST = [o.strip() for o in _CORS_ORIGINS.split(",") if o.strip()] if _CORS_ORIGINS != "*" else ["*"]
+# Produção: https://www.mercadoinsights.online
+# Se ALLOWED_ORIGINS estiver definido, usa essa lista.
+# Senão, permite todas as origens (*) para não bloquear nada.
+_CORS_RAW = os.getenv("ALLOWED_ORIGINS", "").strip()
+if _CORS_RAW:
+    _CORS_LIST = [o.strip() for o in _CORS_RAW.split(",") if o.strip()]
+else:
+    _CORS_LIST = ["*"]
 
 app = FastAPI(title="Mercado Insights Backend")
 
@@ -144,11 +149,16 @@ from app.services.ai_agent import analyze_market, analyze_uploaded_sheet
 from app.services.prompts import market_prompt
 from app.services.llm_service import run_market_analysis
 from app.services.sheet_processor import process_sheet
+from datetime import datetime, timedelta
+import requests
+
 from app.services.mercado_pago_service import (
     create_checkout_url,
     handle_preapproval_created,
     handle_preapproval_updated,
     get_preapproval,
+    MP_ACCESS_TOKEN,
+    MP_PLAN_VALUE,
 )
 from app.services.ml_api import (
     exchange_code_for_tokens,
@@ -169,10 +179,29 @@ from app.services.ml_api import (
 )
 
 # ------------------------------------------------------------------
-# STORE de jobs (em memória)
+# STORE de jobs (em memória) + idempotência de webhook
 # ------------------------------------------------------------------
 JOB_STORE: Dict[str, Dict[str, Any]] = {}
 JOB_STORE_MAX_SIZE = 500
+
+# Cache de question_ids já processados pelo webhook (evita duplicatas)
+_WEBHOOK_PROCESSED: Dict[str, float] = {}  # question_id -> timestamp
+_WEBHOOK_PROCESSED_TTL = 3600  # 1 hora
+_WEBHOOK_PROCESSED_MAX = 2000
+
+
+def _webhook_already_processed(question_id: str) -> bool:
+    """Retorna True se o question_id já foi processado recentemente (idempotência)."""
+    now = time.time()
+    # Limpa entradas expiradas periodicamente
+    if len(_WEBHOOK_PROCESSED) > _WEBHOOK_PROCESSED_MAX:
+        expired = [k for k, ts in _WEBHOOK_PROCESSED.items() if now - ts > _WEBHOOK_PROCESSED_TTL]
+        for k in expired:
+            _WEBHOOK_PROCESSED.pop(k, None)
+    if question_id in _WEBHOOK_PROCESSED:
+        return True
+    _WEBHOOK_PROCESSED[question_id] = now
+    return False
 
 
 def _trim_job_store(max_size: int = JOB_STORE_MAX_SIZE) -> None:
@@ -1524,6 +1553,11 @@ async def ml_webhook(request: Request, background_tasks: BackgroundTasks):
         logger.warning("Webhook ML questions: resource vazio. body_keys=%s", list(body.keys()))
         return JSONResponse(status_code=200, content={"received": True})
 
+    # Idempotência: evita processar a mesma pergunta duas vezes em pouco tempo
+    if _webhook_already_processed(question_id):
+        logger.info("Webhook ML questions: question_id=%s já processada (idempotência), ignorando", question_id)
+        return JSONResponse(status_code=200, content={"received": True})
+
     logger.info("Webhook ML questions: question_id=%s user_id_ml=%s", question_id, user_id_ml)
 
     user = None
@@ -2150,7 +2184,7 @@ async def upload_planilha(
 
     # registra job e dispara background (limita JOB_STORE aos últimos 500 jobs)
     _trim_job_store(JOB_STORE_MAX_SIZE)
-    JOB_STORE[job_id] = {"status": "pending", "filename": file.filename, "_created": time.time()}
+    JOB_STORE[job_id] = {"status": "pending", "filename": file.filename, "_created": time.time(), "_owner": user.id}
     background_tasks.add_task(process_job, job_id, str(file_path), user.id)
 
     logger.info(f"Job {job_id} enfileirado para {file.filename} ({file_path})")
@@ -2159,8 +2193,13 @@ async def upload_planilha(
 
 @app.get("/jobs")
 def list_jobs(user: User = Depends(paid_guard)):
-    """Retorna todos os jobs (id -> status)."""
-    return JOB_STORE
+    """Retorna jobs do usuário autenticado (isolamento multi-tenant)."""
+    user_jobs = {
+        k: {kk: vv for kk, vv in v.items() if not kk.startswith("_")}
+        for k, v in JOB_STORE.items()
+        if v.get("_owner") == user.id
+    }
+    return user_jobs
 
 
 @app.get("/jobs/{job_id}")
@@ -2168,7 +2207,11 @@ def get_job(job_id: str, user: User = Depends(paid_guard)):
     job = JOB_STORE.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="job não encontrado")
-    return job
+    # Isolamento: só o dono pode ver
+    if job.get("_owner") and job["_owner"] != user.id:
+        raise HTTPException(status_code=404, detail="job não encontrado")
+    # Remove campos internos da resposta
+    return {k: v for k, v in job.items() if not k.startswith("_")}
 
 
 @app.get("/api/admin/users")
@@ -2389,6 +2432,150 @@ def admin_logs(admin_user: User = Depends(admin_guard)):
     except Exception as e:
         logger.exception(f"Erro ao ler log: {e}")
         return PlainTextResponse(f"Erro ao ler logs: {e}")
+
+# ------------------------------------------------------------------
+# Billing — Página de assinatura e pagamentos (rota protegida)
+# ------------------------------------------------------------------
+
+@app.get("/api/billing/status")
+def billing_status(user: User = Depends(get_current_user)):
+    """Status da assinatura do usuário (plano, valor, datas, status)."""
+    db = SessionLocal()
+    try:
+        sub = (
+            db.query(Subscription)
+            .filter(Subscription.user_id == user.id)
+            .order_by(Subscription.created_at.desc())
+            .first()
+        )
+        if not sub:
+            return {
+                "plan": "free",
+                "status": "no_subscription",
+                "amount": None,
+                "currency": "BRL",
+                "started_at": None,
+                "next_billing_at": None,
+                "cancel_at_period_end": False,
+                "provider": "mercado_pago",
+                "subscription_id": None,
+            }
+
+        # Buscar dados atualizados do MP se possível
+        mp_data = None
+        if sub.stripe_subscription_id:
+            try:
+                mp_data = get_preapproval(sub.stripe_subscription_id)
+            except Exception:
+                pass
+
+        next_billing = None
+        amount = MP_PLAN_VALUE
+        cancel_at_period_end = False
+
+        if mp_data:
+            auto_rec = mp_data.get("auto_recurring") or {}
+            amount = auto_rec.get("transaction_amount", MP_PLAN_VALUE)
+            next_payment = mp_data.get("next_payment_date")
+            if next_payment:
+                next_billing = next_payment
+            mp_status = mp_data.get("status", sub.status)
+            cancel_at_period_end = mp_status in ("cancelled", "paused")
+        else:
+            mp_status = sub.status
+
+        return {
+            "plan": "pro_mensal" if user.plan == "active" else "free",
+            "status": mp_status or sub.status,
+            "amount": amount,
+            "currency": "BRL",
+            "started_at": sub.started_at.isoformat() if sub.started_at else None,
+            "ends_at": sub.ends_at.isoformat() if sub.ends_at else None,
+            "next_billing_at": next_billing,
+            "cancel_at_period_end": cancel_at_period_end,
+            "provider": "mercado_pago",
+            "subscription_id": sub.stripe_subscription_id,
+        }
+    finally:
+        db.close()
+
+
+@app.get("/api/billing/history")
+def billing_history(user: User = Depends(get_current_user)):
+    """Histórico de assinaturas do usuário."""
+    db = SessionLocal()
+    try:
+        subs = (
+            db.query(Subscription)
+            .filter(Subscription.user_id == user.id)
+            .order_by(Subscription.created_at.desc())
+            .all()
+        )
+        return [
+            {
+                "id": s.id,
+                "subscription_id": s.stripe_subscription_id,
+                "status": s.status,
+                "started_at": s.started_at.isoformat() if s.started_at else None,
+                "ends_at": s.ends_at.isoformat() if s.ends_at else None,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+            }
+            for s in subs
+        ]
+    finally:
+        db.close()
+
+
+@app.post("/api/billing/cancel")
+def billing_cancel(user: User = Depends(get_current_user)):
+    """Solicita cancelamento da assinatura ativa."""
+    db = SessionLocal()
+    try:
+        sub = (
+            db.query(Subscription)
+            .filter(Subscription.user_id == user.id, Subscription.status == "active")
+            .order_by(Subscription.created_at.desc())
+            .first()
+        )
+        if not sub:
+            raise HTTPException(status_code=404, detail="Nenhuma assinatura ativa encontrada.")
+
+        # Tentar cancelar no Mercado Pago
+        canceled_at_mp = False
+        if sub.stripe_subscription_id and MP_ACCESS_TOKEN:
+            try:
+                headers = {"Authorization": f"Bearer {MP_ACCESS_TOKEN}", "Content-Type": "application/json"}
+                resp = requests.put(
+                    f"https://api.mercadopago.com/preapproval/{sub.stripe_subscription_id}",
+                    json={"status": "cancelled"},
+                    headers=headers,
+                    timeout=15,
+                )
+                if resp.status_code == 200:
+                    canceled_at_mp = True
+                    logger.info("Billing: assinatura %s cancelada no MP", sub.stripe_subscription_id)
+                else:
+                    logger.warning("Billing: falha ao cancelar no MP. status=%s body=%s", resp.status_code, resp.text[:300])
+            except Exception as e:
+                logger.exception("Billing: erro ao cancelar no MP: %s", e)
+
+        # Atualizar banco local
+        sub.status = "canceled"
+        sub.ends_at = datetime.utcnow()
+        user_obj = db.query(User).filter(User.id == user.id).first()
+        if user_obj:
+            user_obj.plan = "free"
+            user_obj.updated_at = datetime.utcnow()
+        db.commit()
+
+        # Registrar auditoria
+        db.add(AuditLog(user_id=user.id, event_type="billing_cancel", message=f"Assinatura cancelada. MP={canceled_at_mp}"))
+        db.commit()
+
+        return {"ok": True, "canceled_at_mp": canceled_at_mp}
+    finally:
+        db.close()
+
 
 # ------------------------------------------------------------------
 # Frontend estático (caminho absoluto para funcionar de qualquer pasta)

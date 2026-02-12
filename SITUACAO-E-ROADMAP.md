@@ -51,28 +51,45 @@
 
 ---
 
-## 4. Próximos passos (priorizados)
+## 4. Implementações recentes (sessão 2026-02-12)
+
+| Item | Status |
+|------|--------|
+| **P0: CORS** | ✅ Permite todas origens por padrão; restrição opcional via `ALLOWED_ORIGINS` |
+| **P0: Isolamento de jobs** | ✅ `_owner` por usuário; filtro em `/jobs` e `/jobs/{job_id}` |
+| **P0: Webhook ML idempotente** | ✅ Cache de question_ids processados (TTL 1h) |
+| **Página Assinatura e Pagamentos** | ✅ `GET /api/billing/status`, `GET /api/billing/history`, `POST /api/billing/cancel` + frontend `assinatura.html` |
+| **Identidade visual unificada** | ✅ Botões, tabs, favicon, design system em `app.css` |
+| **Documentação reorganizada** | ✅ 15 arquivos consolidados; `DOCUMENTACAO.md` como índice |
+| **Relatório Codex integrado** | ✅ `RELATORIO_REVISAO_TECNICA.md` |
+| **Documento jurídico** | ✅ `DOCUMENTO_JURIDICO_TERMOS_E_ASSINATURA.md` |
+
+---
+
+## 5. Próximos passos (priorizados)
 
 ### Prioridade média
 
 | # | Item | Descrição |
 |---|------|------------|
 | 1 | **Performance** | Refinar layout e resumo da tela Performance |
-| 2 | **Logs IA** | Opcional: registrar sucessos; filtrar por tipo |
-| 3 | **Certificação ML** | Solicitar certificação do app para busca autenticada estável |
+| 2 | **Termos e Privacidade** | Redigir textos legais (Termos de Uso, Política de Privacidade) e versionar no banco |
+| 3 | **Logs IA** | Registrar sucessos; filtrar por tipo |
+| 4 | **Certificação ML** | Solicitar certificação do app para busca autenticada estável |
 
 ### Backlog
 
 | # | Item |
 |---|------|
-| 4 | **Cache ML** — Tabela `ml_cache` para reduzir chamadas |
-| 5 | **Editor de prompts** — Admin customizar prompts de IA |
-| 6 | **Integração ML Mensagens** — Responder clientes via API |
-| 7 | **Customer Portal MP** — Usuário gerenciar/cancelar assinatura |
+| 5 | **Cache ML** — Tabela `ml_cache` para reduzir chamadas |
+| 6 | **Editor de prompts** — Admin customizar prompts de IA |
+| 7 | **Integração ML Mensagens** — Responder clientes via API |
+| 8 | **Health checks** — `/health`, `/ready`, `/live` |
+| 9 | **Rate limiting** — Por usuário/endpoint |
 
 ---
 
-## 5. Estrutura técnica
+## 6. Estrutura técnica
 
 ### Endpoints principais
 
@@ -80,12 +97,15 @@
 - `GET /api/ml/items`, `GET /api/ml/search`, `POST /api/ml/competitors`
 - `GET /api/ml/questions/pending`, `GET /api/ml/questions/history`, `POST /api/ml/questions/sync`
 - `POST /api/telegram/test`
-- `POST /api/ml-webhook` — Webhook ML (tópico questions)
+- `POST /api/ml-webhook` — Webhook ML (tópico questions, com idempotência)
 - `GET /api/diagnostic-report`
+- `GET /api/billing/status` — Status da assinatura do usuário
+- `GET /api/billing/history` — Histórico de assinaturas
+- `POST /api/billing/cancel` — Cancelar assinatura ativa
 
 ### Modelos principais
 
-- `User`, `MlToken`, `ItemCost`, `PendingQuestion`, `QuestionAnswerFeedback`, `AuditLog`
+- `User`, `MlToken`, `Subscription`, `ItemCost`, `PendingQuestion`, `QuestionAnswerFeedback`, `AuditLog`
 
 ### Infraestrutura
 
@@ -95,9 +115,9 @@
 
 ---
 
-## 6. Revisão técnica (Codex)
+## 8. Revisão técnica (Codex)
 
-O relatório **RELATORIO_REVISAO_TECNICA.md** documenta pontos críticos de segurança e robustez:
+O relatório **RELATORIO_REVISAO_TECNICA.md** documenta pontos de segurança e robustez:
 
-- **P0:** Isolamento de jobs por usuário; CORS; verificação de assinatura no webhook ML
+- **P0 (corrigidos):** Isolamento de jobs por usuário ✅; CORS seguro ✅; idempotência do webhook ML ✅
 - **P1:** Refatoração de `main.py`; persistência de `user_settings`; tratamento de exceções

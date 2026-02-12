@@ -12,6 +12,14 @@
 
 ---
 
+## Jurídico, termos e assinatura
+
+| Documento | Conteúdo |
+|-----------|----------|
+| [DOCUMENTO_JURIDICO_TERMOS_E_ASSINATURA.md](DOCUMENTO_JURIDICO_TERMOS_E_ASSINATURA.md) | Base para Termos de Uso, Contrato SaaS, Política de Privacidade (LGPD) e especificação da página Assinatura e Pagamentos |
+
+---
+
 ## Guias operacionais
 
 | Documento | Conteúdo |
