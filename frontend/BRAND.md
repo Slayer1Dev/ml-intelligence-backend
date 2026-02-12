@@ -1,6 +1,6 @@
-# ML Intelligence — Brand Guidelines
+# Mercado Insights — Brand Guidelines
 
-Guia de identidade visual do projeto.
+Guia de identidade visual. Documento completo: **IDENTIDADE_VISUAL.md**
 
 ---
 

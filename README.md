@@ -1,6 +1,8 @@
-# ML Intelligence
+# Mercado Insights
 
 Ferramentas inteligentes para quem vende no Mercado Livre.
+
+> Documentação: [PROJECT-SUMMARY.md](PROJECT-SUMMARY.md) | [IDENTIDADE_VISUAL.md](IDENTIDADE_VISUAL.md)
 
 ## Rodar localmente
 
