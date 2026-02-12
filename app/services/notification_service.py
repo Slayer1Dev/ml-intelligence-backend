@@ -19,6 +19,24 @@ EMAIL_SMTP_USER = os.getenv("EMAIL_SMTP_USER")
 EMAIL_SMTP_PASSWORD = os.getenv("EMAIL_SMTP_PASSWORD")
 
 
+def get_telegram_bot_username() -> Optional[str]:
+    """Obtém o @username do bot via getMe. Retorna None se falhar."""
+    if not TELEGRAM_BOT_TOKEN:
+        return None
+    try:
+        resp = requests.get(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe",
+            timeout=5,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("ok") and data.get("result", {}).get("username"):
+                return f"@{data['result']['username']}"
+    except Exception:
+        pass
+    return None
+
+
 def send_telegram_test_message(chat_id: str):
     """Envia mensagem de teste no Telegram. Retorna (sucesso, mensagem)."""
     if not TELEGRAM_BOT_TOKEN:
@@ -35,8 +53,13 @@ def send_telegram_test_message(chat_id: str):
         if resp.status_code == 200:
             return True, "Mensagem enviada! Verifique seu Telegram."
         err = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
-        msg = err.get("description", resp.text[:200]) or f"Erro {resp.status_code}"
-        return False, msg
+        raw_msg = err.get("description", resp.text[:200]) or f"Erro {resp.status_code}"
+        # Mensagem específica para "chat not found" - causa mais comum
+        if "chat not found" in raw_msg.lower() or "chat_id" in raw_msg.lower():
+            bot_user = get_telegram_bot_username()
+            hint = f" Abra o Telegram, procure o bot {bot_user} e envie /start." if bot_user else " Abra o Telegram, procure o bot do Mercado Insights (criado no @BotFather) e envie /start."
+            return False, f"Chat não encontrado. Você precisa iniciar uma conversa com o bot antes.{hint} Depois tente novamente."
+        return False, raw_msg
     except Exception as e:
         return False, str(e)
 

@@ -98,9 +98,17 @@
       <div class="card">
         <h2 style="margin-top: 0;">🔔 Notificações no celular (Telegram)</h2>
         <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 1rem;">Receba avisos de novas perguntas nos anúncios diretamente no Telegram. O Chat ID é salvo no banco de dados.</p>
+        <div id="telegram-critico" style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; font-size: 0.9rem;">
+          <strong>⚠️ IMPORTANTE:</strong> Antes de vincular, você <strong>deve</strong> abrir o bot do Mercado Insights no Telegram e enviar <code>/start</code>. Sem isso, o erro "chat not found" aparecerá.
+          <div id="telegram-bot-link" style="margin-top: 0.5rem;"></div>
+        </div>
         <p id="telegram-config-status" style="font-size: 0.9rem; margin-bottom: 0.75rem;"></p>
         <div id="telegram-config-box">
-          <p style="font-size: 0.85rem; color: var(--gray); margin-bottom: 0.5rem;">1. Abra o bot no Telegram e envie /start.<br>2. Obtenha seu Chat ID em <a href="https://t.me/userinfobot" target="_blank" rel="noopener">@userinfobot</a> (envie /start).<br>3. Cole o número abaixo e clique em Vincular ou Atualizar.</p>
+          <p style="font-size: 0.85rem; color: var(--gray); margin-bottom: 0.5rem;">
+            <strong>Passo 1:</strong> Abra o bot do Mercado Insights no Telegram (veja acima) e envie <code>/start</code>.<br>
+            <strong>Passo 2:</strong> Obtenha seu Chat ID em <a href="https://t.me/userinfobot" target="_blank" rel="noopener">@userinfobot</a> (envie /start lá).<br>
+            <strong>Passo 3:</strong> Cole o número abaixo e clique em Vincular ou Atualizar.
+          </p>
           <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
             <input type="text" id="telegram-chat-id-config" placeholder="Ex: 123456789" style="padding: 0.5rem 0.75rem; border: 1px solid var(--gray-light); border-radius: 8px; width: 180px;">
             <button type="button" id="btn-link-telegram-config" class="btn-config btn-test">Vincular / Atualizar</button>
@@ -450,10 +458,21 @@
 
     async function loadTelegramConfig() {
       try {
-        const res = await authFetch(`${API_BASE}/api/me`);
-        const me = await res.json();
+        const [meRes, botRes] = await Promise.all([
+          authFetch(`${API_BASE}/api/me`),
+          authFetch(`${API_BASE}/api/telegram/bot-info`).catch(() => null),
+        ]);
+        const me = await meRes.json();
         const statusEl = document.getElementById('telegram-config-status');
         const inputEl = document.getElementById('telegram-chat-id-config');
+        const botLinkEl = document.getElementById('telegram-bot-link');
+        if (botRes && botRes.ok) {
+          const botData = await botRes.json();
+          const username = botData.bot_username;
+          if (username && botLinkEl) {
+            botLinkEl.innerHTML = '<a href="https://t.me/' + username.replace('@', '') + '" target="_blank" rel="noopener" style="color: var(--blue-primary); font-weight: 600;">Clique aqui para abrir o bot ' + username + ' no Telegram →</a>';
+          }
+        }
         if (me && me.telegramLinked) {
           statusEl.textContent = '✅ Telegram vinculado. Você receberá notificações de novas perguntas.';
           statusEl.style.color = '#059669';

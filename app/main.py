@@ -527,6 +527,14 @@ def link_telegram(data: TelegramLinkInput, user: User = Depends(get_current_user
         db.close()
 
 
+@app.get("/api/telegram/bot-info")
+def telegram_bot_info(user: User = Depends(get_current_user)):
+    """Retorna o @username do bot para exibir nas instruções."""
+    from app.services.notification_service import get_telegram_bot_username
+    username = get_telegram_bot_username()
+    return {"bot_username": username, "ok": bool(username)}
+
+
 @app.post("/api/telegram/test")
 def telegram_test_message(user: User = Depends(get_current_user)):
     """Envia mensagem de teste no Telegram para verificar a conexão."""
