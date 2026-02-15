@@ -159,14 +159,18 @@ def _fetch_clerk_user_info(clerk_user_id: str) -> dict:
         return {"ok": False, "status": None, "error": str(e), "email": None}
 
 
-def get_auth_debug_snapshot(credentials: HTTPAuthorizationCredentials | None, user_email: str | None = None) -> dict:
+def get_auth_debug_snapshot(
+    credentials: HTTPAuthorizationCredentials | None,
+    user_email: str | None = None,
+    clerk_user_id_override: str | None = None,
+) -> dict:
     """Build detailed auth debug information for troubleshooting Clerk email/admin issues."""
     claims = {}
     decoded = getattr(credentials, "decoded", None) if credentials else None
     if isinstance(decoded, dict):
         claims = decoded
 
-    clerk_user_id = claims.get("sub")
+    clerk_user_id = claims.get("sub") or clerk_user_id_override
     email_from_claims = _extract_email_from_claims(claims) if claims else None
     clerk_lookup = _fetch_clerk_user_info(clerk_user_id) if clerk_user_id else {"ok": False, "status": None, "error": "sub ausente", "email": None}
 

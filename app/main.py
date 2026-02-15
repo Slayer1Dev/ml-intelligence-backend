@@ -23,6 +23,7 @@ import json
 import logging
 import time
 import uuid
+import base64
 from pathlib import Path
 import aiofiles
 from typing import Dict, Any, Optional, List
@@ -612,10 +613,46 @@ def debug_admin(user: User = Depends(get_current_user)):
 @app.get("/api/debug-auth-clerk")
 def debug_auth_clerk(
     user: User = Depends(get_current_user),
-    credentials: HTTPAuthorizationCredentials | None = Depends(clerk_auth_guard),
+    request: Request = None,
 ):
     """Diagnóstico detalhado de autenticação Clerk para investigar email/admin."""
-    data = get_auth_debug_snapshot(credentials, user.email)
+    raw_auth = (request.headers.get("authorization", "") if request else "").strip()
+    raw_token = ""
+    if raw_auth.lower().startswith("bearer "):
+        raw_token = raw_auth[7:].strip()
+
+    unverified_claims = {}
+    token_parse_error = None
+    if raw_token:
+        try:
+            parts = raw_token.split(".")
+            if len(parts) >= 2:
+                payload = parts[1] + "=" * (-len(parts[1]) % 4)
+                decoded = base64.urlsafe_b64decode(payload.encode("utf-8")).decode("utf-8")
+                unverified_claims = json.loads(decoded)
+        except Exception as e:
+            token_parse_error = str(e)
+
+    data = get_auth_debug_snapshot(
+        credentials=None,
+        user_email=user.email,
+        clerk_user_id_override=user.clerk_user_id,
+    )
+    data["token_unverified_from_header"] = {
+        "has_authorization_header": bool(raw_auth),
+        "has_bearer_token": bool(raw_token),
+        "parse_error": token_parse_error,
+        "claims_keys": sorted(list(unverified_claims.keys())) if isinstance(unverified_claims, dict) else [],
+        "sub": unverified_claims.get("sub") if isinstance(unverified_claims, dict) else None,
+        "iss": unverified_claims.get("iss") if isinstance(unverified_claims, dict) else None,
+        "aud": unverified_claims.get("aud") if isinstance(unverified_claims, dict) else None,
+        "email_like_fields": {
+            "email": unverified_claims.get("email") if isinstance(unverified_claims, dict) else None,
+            "primary_email": unverified_claims.get("primary_email") if isinstance(unverified_claims, dict) else None,
+            "primaryEmail": unverified_claims.get("primaryEmail") if isinstance(unverified_claims, dict) else None,
+            "email_addresses_present": bool(unverified_claims.get("email_addresses")) if isinstance(unverified_claims, dict) else False,
+        },
+    }
     data["db_user"] = {
         "id": user.id,
         "clerk_user_id": user.clerk_user_id,
