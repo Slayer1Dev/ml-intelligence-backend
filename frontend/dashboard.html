@@ -92,6 +92,14 @@
         <button id="btn-conectar-ml" class="btn" type="button" style="margin-top: 0.25rem;">Conectar Mercado Livre</button>
         <p id="ml-conectado" style="font-size: 0.9rem; color: var(--success, #0a0); display: none;">✓ Conta conectada</p>
       </div>
+
+      <div id="auth-debug-panel" class="card" style="margin-top: 1rem; padding: 1rem;">
+        <strong>Diagnóstico de autenticação (temporário)</strong>
+        <p style="margin-top: 0.5rem; color: var(--gray); font-size: 0.9rem;">Use para investigar por que o e-mail/admin está vazio.</p>
+        <button id="btn-run-auth-debug" class="btn btn-secondary" type="button" style="margin-top: 0.25rem;">Rodar teste de autenticação</button>
+        <button id="btn-copy-auth-debug" class="btn" type="button" style="margin-top: 0.25rem; margin-left: 0.5rem;">Copiar resultado</button>
+        <pre id="auth-debug-output" style="margin-top: 0.75rem; white-space: pre-wrap; background: #f7f9fc; padding: 0.75rem; border-radius: 8px; border: 1px solid #dce3ef; max-height: 360px; overflow: auto;">Clique em "Rodar teste de autenticação".</pre>
+      </div>
     </main>
   </div>
 
@@ -158,6 +166,34 @@
       }
     }
 
+    async function runAuthDiagnostic() {
+      const outputEl = document.getElementById('auth-debug-output');
+      if (!outputEl) return;
+      outputEl.textContent = 'Executando teste...';
+      try {
+        const res = await authFetch(API_BASE + '/api/debug-auth-clerk');
+        const data = await res.json();
+        if (!res.ok) {
+          outputEl.textContent = 'Erro HTTP ' + res.status + ':\\n' + JSON.stringify(data, null, 2);
+          return;
+        }
+        outputEl.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        outputEl.textContent = 'Erro ao rodar diagnóstico: ' + (e.message || 'desconhecido');
+      }
+    }
+
+    async function copyAuthDiagnostic() {
+      const outputEl = document.getElementById('auth-debug-output');
+      if (!outputEl) return;
+      try {
+        await navigator.clipboard.writeText(outputEl.textContent || '');
+        alert('Resultado copiado.');
+      } catch (_) {
+        alert('Não foi possível copiar automaticamente. Copie manualmente o texto abaixo.');
+      }
+    }
+
     async function init() {
       await initClerkAuth({
         signInContainerId: 'clerk-signin',
@@ -167,6 +203,11 @@
       if (!window.ClerkAuth?.signedIn) return;
 
       try {
+        const runBtn = document.getElementById('btn-run-auth-debug');
+        const copyBtn = document.getElementById('btn-copy-auth-debug');
+        if (runBtn) runBtn.onclick = runAuthDiagnostic;
+        if (copyBtn) copyBtn.onclick = copyAuthDiagnostic;
+
         const res = await authFetch(API_BASE + '/api/me');
         const me = await res.json();
         applyUserState(me);

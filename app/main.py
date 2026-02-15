@@ -7,7 +7,15 @@ from fastapi.responses import PlainTextResponse, JSONResponse, RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
-from app.auth import admin_guard, clerk_auth_guard, get_admin_emails, get_clerk_config, get_current_user, is_admin
+from app.auth import (
+    admin_guard,
+    clerk_auth_guard,
+    get_admin_emails,
+    get_auth_debug_snapshot,
+    get_clerk_config,
+    get_current_user,
+    is_admin,
+)
 
 import hashlib
 import hmac
@@ -599,6 +607,22 @@ def debug_admin(user: User = Depends(get_current_user)):
             )
         ),
     }
+
+
+@app.get("/api/debug-auth-clerk")
+def debug_auth_clerk(
+    user: User = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials | None = Depends(clerk_auth_guard),
+):
+    """Diagnóstico detalhado de autenticação Clerk para investigar email/admin."""
+    data = get_auth_debug_snapshot(credentials, user.email)
+    data["db_user"] = {
+        "id": user.id,
+        "clerk_user_id": user.clerk_user_id,
+        "email": user.email,
+        "plan": user.plan,
+    }
+    return data
 
 
 @app.get("/api/ml-auth-url")
