@@ -10,21 +10,36 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css">
   <style>
-    .chart-placeholder {
-      background: linear-gradient(135deg, rgba(30, 64, 175, 0.05) 0%, rgba(251, 191, 36, 0.1) 100%);
-      border: 1px dashed rgba(30, 64, 175, 0.2);
-      border-radius: 12px;
-      padding: 4rem;
-      margin-top: 1.5rem;
-      text-align: center;
-      color: var(--gray);
-    }
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .metric-card { text-align: center; padding: 1.25rem 1rem; }
+    .metric-card .icon { font-size: 1.75rem; margin-bottom: 0.5rem; }
+    .metric-card .number { font-size: 2rem; font-weight: 700; color: var(--blue-primary); }
+    .metric-card .label { color: var(--gray); font-size: 0.85rem; margin-top: 0.25rem; }
+    .metric-card .link { font-size: 0.8rem; color: var(--blue-primary); margin-top: 0.5rem; display: inline-block; }
+    .summary-row { display: flex; justify-content: space-between; padding: 0.6rem 0; border-bottom: 1px solid rgba(30,64,175,0.06); }
+    .summary-row:last-child { border-bottom: none; }
+    .summary-label { color: var(--gray); font-weight: 500; }
+    .summary-value { font-weight: 600; }
+    .top-items-list { margin-top: 1rem; }
+    .top-item { display: flex; align-items: center; gap: 1rem; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem; transition: background 0.15s; }
+    .top-item:hover { background: var(--blue-light); }
+    .top-item .rank { font-weight: 700; color: var(--blue-primary); min-width: 2rem; text-align: center; font-size: 1.1rem; }
+    .top-item .thumb { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; background: #f0f0f0; }
+    .top-item .info { flex: 1; min-width: 0; }
+    .top-item .title { font-size: 0.9rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .top-item .price { font-weight: 600; color: var(--blue-primary); font-size: 0.9rem; }
+    .top-item .visits { font-size: 0.8rem; color: var(--gray); }
+    .health-bar { height: 8px; border-radius: 4px; background: #e5e7eb; margin-top: 0.5rem; overflow: hidden; }
+    .health-bar .fill { height: 100%; border-radius: 4px; transition: width 0.6s; }
+    .health-good { background: #22c55e; }
+    .health-warning { background: #f59e0b; }
+    .health-danger { background: #ef4444; }
   </style>
 </head>
 <body class="app">
   <header class="app-header">
     <a href="dashboard.html" class="app-logo">Mercado Insights</a>
-    <span class="app-user">Ola, vendedor</span>
+    <span class="app-user">Olá, vendedor</span>
     <div id="clerk-user-button"></div>
   </header>
 
@@ -34,13 +49,13 @@
     <aside class="app-sidebar">
       <nav>
         <a href="dashboard.html">Resumo</a>
-        <a href="financeiro.html">Painel Financeiro</a>
+        <a href="financeiro.html" data-paid>Painel Financeiro</a>
         <a href="calculator.html">Calculadora de Lucro</a>
-        <a href="anuncios.html">Meus Anuncios</a>
-        <a href="performance.html" class="active">Performance</a>
-        <a href="concorrentes.html">Concorrentes</a>
-        <a href="perguntas-anuncios.html">Perguntas nos anúncios</a>
-        <a href="ia-assistente.html">IA Assistente</a>
+        <a href="anuncios.html" data-paid>Meus Anúncios</a>
+        <a href="performance.html" class="active" data-paid>Performance</a>
+        <a href="concorrentes.html" data-paid>Concorrentes</a>
+        <a href="perguntas-anuncios.html" data-paid>Perguntas nos anúncios</a>
+        <a href="ia-assistente.html" data-paid>IA Assistente</a>
         <a href="assinatura.html">Assinatura</a>
         <a href="config-ml.html">⚙️ Config. Mercado Livre</a>
         <span id="admin-link-wrap" style="display:none;"><hr style="margin: 0.5rem 0; border-color: var(--gray-light);"><a href="admin.html">⚙️ Admin</a></span>
@@ -49,12 +64,12 @@
 
     <main class="app-main">
       <h1>Performance da Conta</h1>
-      <p class="subtitle">Analises e graficos sobre vendas, visualizacoes e metricas da sua operacao.</p>
-      
+      <p class="subtitle">Visão geral de anúncios, pedidos e saúde da sua operação no Mercado Livre.</p>
+
       <div id="ml-not-connected" class="card" style="display: none;">
         <div class="coming-soon">
           <h2>Conecte sua conta do Mercado Livre</h2>
-          <p>Esta função mostrará o desempenho da sua conta após a integração com o Mercado Livre.</p>
+          <p>Esta função mostrará o desempenho da sua conta após a integração.</p>
           <div style="margin-top: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
             <button type="button" id="btn-conectar-ml-page" class="button">Conectar Mercado Livre</button>
             <a href="dashboard.html" class="button" style="text-decoration: none;">Ir para Dashboard</a>
@@ -66,7 +81,7 @@
         <div class="coming-soon">
           <h2>Plano Pro necessário</h2>
           <p>Assine o plano para acessar Performance e outras ferramentas.</p>
-          <a href="dashboard.html" class="button" style="margin-top: 1rem;">Ver planos</a>
+          <a href="assinatura.html" class="button" style="margin-top: 1rem;">Ver planos</a>
         </div>
       </div>
 
@@ -75,38 +90,64 @@
       </div>
 
       <div id="metrics-container" style="display: none;">
-        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-          <a href="anuncios.html?status=active" class="card card-link" style="text-align: center; text-decoration: none; color: inherit;">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📦</div>
-            <div style="font-size: 2rem; font-weight: bold; color: var(--primary);" id="metric-active">-</div>
-            <div style="color: var(--gray); font-size: 0.9rem;">Anúncios Ativos</div>
-            <div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--primary);">Ver lista →</div>
+        <!-- Cards de métricas -->
+        <div class="metrics-grid">
+          <a href="anuncios.html?status=active" class="card metric-card card-link" style="text-decoration: none; color: inherit;">
+            <div class="icon">📦</div>
+            <div class="number" id="metric-active">-</div>
+            <div class="label">Ativos</div>
+            <span class="link">Ver lista →</span>
           </a>
-          <a href="anuncios.html?status=paused" class="card card-link" style="text-align: center; text-decoration: none; color: inherit;">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">⏸️</div>
-            <div style="font-size: 2rem; font-weight: bold; color: var(--warning);" id="metric-paused">-</div>
-            <div style="color: var(--gray); font-size: 0.9rem;">Pausados / Inativo p/ revisar</div>
-            <div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--primary);">Ver lista →</div>
+          <a href="anuncios.html?status=paused" class="card metric-card card-link" style="text-decoration: none; color: inherit;">
+            <div class="icon">⏸️</div>
+            <div class="number" id="metric-paused" style="color: #f59e0b;">-</div>
+            <div class="label">Pausados / Revisar</div>
+            <span class="link">Ver lista →</span>
           </a>
-          <a href="anuncios.html?status=closed" class="card card-link" style="text-align: center; text-decoration: none; color: inherit;">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">✅</div>
-            <div style="font-size: 2rem; font-weight: bold; color: var(--success);" id="metric-closed">-</div>
-            <div style="color: var(--gray); font-size: 0.9rem;">Anúncios Fechados</div>
-            <div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--primary);">Ver lista →</div>
+          <a href="anuncios.html?status=closed" class="card metric-card card-link" style="text-decoration: none; color: inherit;">
+            <div class="icon">✅</div>
+            <div class="number" id="metric-closed" style="color: #22c55e;">-</div>
+            <div class="label">Fechados</div>
+            <span class="link">Ver lista →</span>
           </a>
-          <div class="card" style="text-align: center;">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">💰</div>
-            <div style="font-size: 2rem; font-weight: bold; color: var(--primary);" id="metric-orders">-</div>
-            <div style="color: var(--gray); font-size: 0.9rem;">Pedidos Pagos</div>
+          <div class="card metric-card">
+            <div class="icon">💰</div>
+            <div class="number" id="metric-orders">-</div>
+            <div class="label">Pedidos Pagos</div>
           </div>
         </div>
 
-        <div class="card">
-          <h2 style="margin-top: 0;">Resumo da Conta</h2>
-          <div id="summary-content"></div>
-          <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--gray-light);">
-            <a href="anuncios.html" class="button">Ver todos os anúncios</a>
+        <!-- Saúde da operação -->
+        <div class="card" style="margin-bottom: 1.5rem;">
+          <h3 style="margin-bottom: 1rem; color: var(--blue-primary);">Saúde da operação</h3>
+          <div id="health-content">
+            <div class="summary-row">
+              <span class="summary-label">Taxa de anúncios ativos</span>
+              <span class="summary-value" id="health-active-pct">—</span>
+            </div>
+            <div class="health-bar"><div class="fill" id="health-active-bar" style="width: 0;"></div></div>
+            <div class="summary-row" style="margin-top: 0.75rem;">
+              <span class="summary-label">Anúncios que precisam de atenção</span>
+              <span class="summary-value" id="health-attention">—</span>
+            </div>
           </div>
+        </div>
+
+        <!-- Resumo detalhado -->
+        <div class="card" style="margin-bottom: 1.5rem;">
+          <h3 style="margin-bottom: 1rem; color: var(--blue-primary);">Resumo da Conta</h3>
+          <div id="summary-content"></div>
+        </div>
+
+        <!-- Top anúncios (se disponível) -->
+        <div class="card" id="top-items-card" style="display: none;">
+          <h3 style="margin-bottom: 0.5rem; color: var(--blue-primary);">Top Anúncios Ativos</h3>
+          <p style="font-size: 0.85rem; color: var(--gray); margin-bottom: 0.75rem;">Seus anúncios ativos com maior preço de venda.</p>
+          <div id="top-items-list" class="top-items-list"></div>
+        </div>
+
+        <div class="card" style="padding: 1rem 1.5rem; text-align: center;">
+          <a href="anuncios.html" class="button">Ver todos os anúncios</a>
         </div>
       </div>
     </main>
@@ -117,22 +158,21 @@
   <script>
     const API_BASE = window.location.origin;
 
-    async function checkMLConnection(retries = 2) {
-      for (let i = 0; i <= retries; i++) {
+    function formatCurrency(val) {
+      if (!val && val !== 0) return '—';
+      return 'R$ ' + Number(val).toFixed(2).replace('.', ',');
+    }
+
+    async function checkMLConnection(retries) {
+      retries = retries || 2;
+      for (var i = 0; i <= retries; i++) {
         try {
-          const res = await authFetch(API_BASE + '/api/ml-status');
-          if (res.status === 401 && i < retries) {
-            await new Promise(r => setTimeout(r, 1200));
-            continue;
-          }
-          const data = await res.json();
+          var res = await authFetch(API_BASE + '/api/ml-status');
+          if (res.status === 401 && i < retries) { await new Promise(function(r){setTimeout(r,1200)}); continue; }
+          var data = await res.json();
           return data.connected === true;
         } catch (e) {
-          if (i < retries) {
-            await new Promise(r => setTimeout(r, 1200));
-            continue;
-          }
-          console.error('Erro ao verificar conexão ML:', e);
+          if (i < retries) { await new Promise(function(r){setTimeout(r,1200)}); continue; }
           return false;
         }
       }
@@ -140,68 +180,119 @@
     }
 
     async function loadMetrics() {
-      const loadingEl = document.getElementById('loading');
-      const containerEl = document.getElementById('metrics-container');
-      const notConnectedEl = document.getElementById('ml-not-connected');
+      var loadingEl = document.getElementById('loading');
+      var containerEl = document.getElementById('metrics-container');
+      var notConnectedEl = document.getElementById('ml-not-connected');
 
       loadingEl.style.display = 'block';
       containerEl.style.display = 'none';
       notConnectedEl.style.display = 'none';
 
       try {
-        const res = await authFetch(API_BASE + '/api/ml/metrics');
-        
+        var res = await authFetch(API_BASE + '/api/ml/metrics');
+
         if (res.status === 403) {
-          const errData = await res.json().catch(() => ({}));
-          const isMlNotConnected = errData.detail === 'ml_not_connected';
-          document.getElementById(isMlNotConnected ? 'ml-not-connected' : 'upgrade-required').style.display = 'block';
+          var errData = await res.json().catch(function(){ return {}; });
+          document.getElementById(errData.detail === 'ml_not_connected' ? 'ml-not-connected' : 'upgrade-required').style.display = 'block';
           loadingEl.style.display = 'none';
           return;
         }
 
-        if (!res.ok) {
-          throw new Error('Erro ao buscar métricas');
-        }
+        if (!res.ok) throw new Error('Erro ao buscar métricas');
 
-        const data = await res.json();
-        const items = data.items || {};
-        const orders = data.orders || {};
+        var data = await res.json();
+        var items = data.items || {};
+        var orders = data.orders || {};
 
-        document.getElementById('metric-active').textContent = items.active || 0;
-        document.getElementById('metric-paused').textContent = items.paused || 0;
-        document.getElementById('metric-closed').textContent = items.closed || 0;
+        var active = items.active || 0;
+        var paused = items.paused || 0;
+        var closed = items.closed || 0;
+        var total = items.total || 0;
+
+        document.getElementById('metric-active').textContent = active;
+        document.getElementById('metric-paused').textContent = paused;
+        document.getElementById('metric-closed').textContent = closed;
         document.getElementById('metric-orders').textContent = orders.paid || 0;
 
-        const summaryEl = document.getElementById('summary-content');
-        summaryEl.innerHTML = `
-          <div style="line-height: 2;">
-            <p><strong>Total de Anúncios:</strong> ${items.total || 0}</p>
-            <p><strong>Anúncios Ativos:</strong> ${items.active || 0} <span style="color: var(--gray); font-size: 0.9rem;">— visíveis na vitrine</span></p>
-            <p><strong>Pausados / Inativo para revisar:</strong> ${items.paused || 0} <span style="color: var(--gray); font-size: 0.9rem;">— exigem ação</span></p>
-            <p><strong>Fechados:</strong> ${items.closed || 0}</p>
-            <p><strong>Pedidos Pagos:</strong> ${orders.paid || 0}</p>
-          </div>
-        `;
+        // Saúde da operação
+        var activePct = total > 0 ? Math.round((active / total) * 100) : 0;
+        document.getElementById('health-active-pct').textContent = activePct + '%';
+        var bar = document.getElementById('health-active-bar');
+        bar.style.width = activePct + '%';
+        bar.className = 'fill ' + (activePct >= 70 ? 'health-good' : activePct >= 40 ? 'health-warning' : 'health-danger');
+
+        document.getElementById('health-attention').textContent = paused > 0 ? paused + ' anúncio(s)' : 'Nenhum';
+        document.getElementById('health-attention').style.color = paused > 0 ? '#f59e0b' : '#22c55e';
+
+        // Resumo
+        document.getElementById('summary-content').innerHTML =
+          '<div class="summary-row"><span class="summary-label">Total de anúncios</span><span class="summary-value">' + total + '</span></div>' +
+          '<div class="summary-row"><span class="summary-label">Ativos (visíveis na vitrine)</span><span class="summary-value" style="color: var(--blue-primary);">' + active + '</span></div>' +
+          '<div class="summary-row"><span class="summary-label">Pausados / Inativo p/ revisar</span><span class="summary-value" style="color: #f59e0b;">' + paused + '</span></div>' +
+          '<div class="summary-row"><span class="summary-label">Fechados</span><span class="summary-value">' + closed + '</span></div>' +
+          '<div class="summary-row"><span class="summary-label">Pedidos pagos</span><span class="summary-value" style="color: #22c55e;">' + (orders.paid || 0) + '</span></div>';
 
         containerEl.style.display = 'block';
         loadingEl.style.display = 'none';
+
+        // Carregar top anúncios (em paralelo)
+        loadTopItems();
+
       } catch (e) {
         console.error('Erro ao carregar métricas:', e);
-        containerEl.innerHTML = '<p style="text-align: center; color: var(--error); padding: 2rem;">Erro ao carregar métricas. Tente novamente.</p>';
+        containerEl.innerHTML = '<div class="card" style="text-align: center; color: #dc2626; padding: 2rem;">Erro ao carregar métricas. Tente novamente.</div>';
         containerEl.style.display = 'block';
         loadingEl.style.display = 'none';
       }
     }
 
+    async function loadTopItems() {
+      try {
+        var res = await authFetch(API_BASE + '/api/ml/items?status=active&limit=10&offset=0');
+        if (!res.ok) return;
+        var data = await res.json();
+        var itemsList = data.items || data.results || [];
+        if (!itemsList.length) return;
+
+        // Ordenar por preço desc
+        itemsList.sort(function(a, b) { return (b.price || 0) - (a.price || 0); });
+        var top = itemsList.slice(0, 5);
+
+        var html = '';
+        for (var i = 0; i < top.length; i++) {
+          var it = top[i];
+          var thumb = (it.thumbnail || it.secure_thumbnail || '').replace('http:', 'https:');
+          var title = it.title || 'Sem título';
+          var price = it.price || 0;
+          var visits = it.visits || it.initial_quantity || '';
+
+          html += '<div class="top-item">';
+          html += '<span class="rank">#' + (i + 1) + '</span>';
+          if (thumb) html += '<img class="thumb" src="' + thumb + '" alt="" loading="lazy">';
+          html += '<div class="info">';
+          html += '<div class="title">' + title + '</div>';
+          html += '<div class="price">' + formatCurrency(price) + '</div>';
+          if (visits) html += '<div class="visits">' + visits + ' visitas</div>';
+          html += '</div>';
+          html += '</div>';
+        }
+
+        document.getElementById('top-items-list').innerHTML = html;
+        document.getElementById('top-items-card').style.display = 'block';
+      } catch (e) {
+        console.error('Erro ao carregar top items:', e);
+      }
+    }
+
     function setupConectarMlButton() {
-      const btn = document.getElementById('btn-conectar-ml-page');
+      var btn = document.getElementById('btn-conectar-ml-page');
       if (!btn) return;
-      btn.onclick = async () => {
+      btn.onclick = async function() {
         btn.disabled = true;
         btn.textContent = 'Redirecionando…';
         try {
-          const u = await authFetch(API_BASE + '/api/ml-auth-url');
-          const d = await u.json();
+          var u = await authFetch(API_BASE + '/api/ml-auth-url');
+          var d = await u.json();
           if (u.ok && d.url) window.location.href = d.url;
           else alert(d.detail || 'Erro ao obter URL.');
         } catch (e) { alert('Erro: ' + (e.message || 'Não foi possível conectar.')); }
@@ -212,16 +303,14 @@
 
     async function init() {
       await initClerkAuth({ signInContainerId: 'clerk-signin', userButtonContainerId: 'clerk-user-button', appContentId: 'app-content' });
-      
-      if (!window.ClerkAuth?.signedIn) return;
+      if (!window.ClerkAuth || !window.ClerkAuth.signedIn) return;
       setupConectarMlButton();
-      const connected = await checkMLConnection();
+      var connected = await checkMLConnection();
       if (!connected) {
         document.getElementById('ml-not-connected').style.display = 'block';
         document.getElementById('loading').style.display = 'none';
         return;
       }
-
       loadMetrics();
     }
 

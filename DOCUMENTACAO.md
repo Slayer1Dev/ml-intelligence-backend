@@ -25,6 +25,8 @@
 | Documento | Conteúdo |
 |-----------|----------|
 | [DEPLOY_INSTRUCOES.md](DEPLOY_INSTRUCOES.md) | Deploy no Railway |
+| [CLERK_PRODUCAO.md](CLERK_PRODUCAO.md) | Migrar Clerk de Development para Production (passo a passo) |
+| [CLOUDFLARE_SETUP.md](CLOUDFLARE_SETUP.md) | Cloudflare: DNS, firewall, WAF, DDoS, cache |
 | [COSTS.md](COSTS.md) | Custos e infraestrutura |
 | [PROBLEMA_CONFIGURACAO_ML.md](PROBLEMA_CONFIGURACAO_ML.md) | Configuração do app Mercado Livre (permissões, tópicos) |
 
@@ -47,6 +49,14 @@
 | [MERCADO-PAGO.md](MERCADO-PAGO.md) | Assinaturas |
 | [CLERK.md](CLERK.md) | Autenticação |
 | [ANALISE_API_ML_CONCORRENTES.md](ANALISE_API_ML_CONCORRENTES.md) | API de busca de concorrentes |
+
+---
+
+## Analise e planejamento
+
+| Documento | Conteúdo |
+|-----------|----------|
+| [ANALISE_DASHBOARD_MULTILOJAS.md](ANALISE_DASHBOARD_MULTILOJAS.md) | Dashboard automatizado multi-lojas: analise da planilha, arquitetura Store/StoreItem, fases, Shopee, visao geral/isolada |
 
 ---
 

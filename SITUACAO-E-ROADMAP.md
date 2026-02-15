@@ -68,24 +68,41 @@
 
 ## 5. Próximos passos (priorizados)
 
+### Prioridade alta (infraestrutura)
+
+| # | Item | Descrição | Responsável |
+|---|------|-----------|-------------|
+| 1 | **Clerk Produção** | Migrar para Production (ver `CLERK_PRODUCAO.md`) | Operador |
+| 2 | **Cloudflare (Firewall)** | DNS + proxy + WAF + DDoS (ver `CLOUDFLARE_SETUP.md`) | Operador |
+| 3 | **Dashboard Multi-Lojas (Fase 1)** | Loja manual + import planilha + graficos (ver `ANALISE_DASHBOARD_MULTILOJAS.md`) | Dev |
+
+### Prioridade alta (produto)
+
+| # | Item | Descrição |
+|---|------|------------|
+| 4 | **Multi-Store ML (Fase 2)** | Suportar N contas ML via API; Store por conexao |
+| 5 | **Analise Consolidada (Fase 3)** | Visao geral cross-store; comparativo entre lojas |
+| 6 | **Termos e Privacidade** | Redigir textos legais e versionar no banco |
+
 ### Prioridade média
 
 | # | Item | Descrição |
 |---|------|------------|
-| 1 | **Performance** | Refinar layout e resumo da tela Performance |
-| 2 | **Termos e Privacidade** | Redigir textos legais (Termos de Uso, Política de Privacidade) e versionar no banco |
-| 3 | **Logs IA** | Registrar sucessos; filtrar por tipo |
-| 4 | **Certificação ML** | Solicitar certificação do app para busca autenticada estável |
+| 7 | **Certificação ML** | Solicitar certificação do app para busca autenticada estável |
+| 8 | **Integração Shopee (Fase 4)** | OAuth Shopee; sync produtos/pedidos; Store platform=shopee |
+| 9 | **API Shopping de Preços (Fase 5)** | Comparação de preços de mercado em tempo real (quando obtivermos acesso) |
+| 10 | **Logs IA** | Registrar sucessos; filtrar por tipo |
 
 ### Backlog
 
 | # | Item |
 |---|------|
-| 5 | **Cache ML** — Tabela `ml_cache` para reduzir chamadas |
-| 6 | **Editor de prompts** — Admin customizar prompts de IA |
-| 7 | **Integração ML Mensagens** — Responder clientes via API |
-| 8 | **Health checks** — `/health`, `/ready`, `/live` |
-| 9 | **Rate limiting** — Por usuário/endpoint |
+| 11 | **Cache ML** — Tabela `ml_cache` para reduzir chamadas à API |
+| 12 | **Editor de prompts** — Admin customizar prompts de IA |
+| 13 | **Integração ML Mensagens** — Responder clientes via API |
+| 14 | **Health checks** — `/health`, `/ready`, `/live` |
+| 15 | **Rate limiting** — Por usuário/endpoint |
+| 16 | **Refatorar main.py** — Quebrar em routers modulares |
 
 ---
 
