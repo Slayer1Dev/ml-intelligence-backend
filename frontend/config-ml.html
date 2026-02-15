@@ -27,11 +27,7 @@
     .btn-disconnect:hover { background: #b91c1c; transform: translateY(-1px); }
     .btn-test { background: #64748b; color: white; }
     .btn-test:hover { background: #475569; }
-    #btn-download-report:hover { background: #0f766e !important; transform: translateY(-1px); }
     .btn-config:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-    .diagnostic-section { background: #f8fafc; border-radius: 8px; padding: 1rem; margin-top: 1rem; font-size: 0.9rem; }
-    .diagnostic-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; }
-    .diagnostic-item .icon { font-size: 1.2rem; }
     .log-box { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 0.85rem; max-height: 300px; overflow-y: auto; margin-top: 1rem; }
   </style>
 </head>
@@ -79,20 +75,10 @@
         </div>
       </div>
 
-      <!-- Diagnóstico Avançado -->
       <div class="card">
-        <h2 style="margin-top: 0;">Diagnóstico Avançado</h2>
-        <p style="color: var(--gray); font-size: 0.9rem;">Verifica permissões, testa APIs e identifica problemas.</p>
-        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem;">
-          <button id="btn-diagnostic" class="btn-config btn-test">Executar Diagnóstico</button>
-          <button id="btn-download-report" class="btn-config btn-test" style="background: #0d9488; color: white;">
-            Executar testes e baixar log (.txt)
-          </button>
-        </div>
-        <p style="color: var(--gray); font-size: 0.8rem; margin-top: 0.5rem;">
-          O segundo botão executa vários testes, gera um relatório completo e permite baixar em .txt para anexar ao solicitar suporte.
-        </p>
-        <div id="diagnostic-results" style="display: none;"></div>
+        <h2 style="margin-top: 0;">Diagnóstico</h2>
+        <p style="color: var(--gray); font-size: 0.9rem;">O diagnóstico completo foi centralizado no painel Admin.</p>
+        <p style="margin-top: 0.5rem;"><a href="admin.html">Abrir Admin para executar testes e baixar log (.txt)</a></p>
       </div>
 
       <!-- Telegram Bot (Notificações) -->
@@ -318,87 +304,6 @@
       btn.textContent = 'Desconectar';
     }
 
-    async function runDiagnostic() {
-      const btn = document.getElementById('btn-diagnostic');
-      const resultsDiv = document.getElementById('diagnostic-results');
-      
-      btn.disabled = true;
-      btn.textContent = 'Executando...';
-      resultsDiv.style.display = 'block';
-      resultsDiv.innerHTML = '<p>Executando diagnóstico completo...</p>';
-      addLog('Iniciando diagnóstico avançado...');
-      
-      try {
-        const res = await authFetch(`${API_BASE}/api/ml-diagnostic`);
-        const data = await res.json();
-        
-        if (!res.ok) {
-          resultsDiv.innerHTML = `<div class="diagnostic-section"><p style="color: #dc2626;">❌ Erro: ${data.detail || 'Falha ao executar diagnóstico.'}</p></div>`;
-          addLog(`Diagnóstico falhou: ${data.detail}`, 'error');
-          return;
-        }
-
-        addLog('Diagnóstico concluído', 'success');
-
-        // Monta resultado visual
-        let html = '<div class="diagnostic-section"><h3 style="margin-top: 0;">Resultado do Diagnóstico</h3>';
-        
-        // Status de conexão
-        html += `<div class="diagnostic-item">
-          <span class="icon">${data.connected ? '✅' : '❌'}</span>
-          <span><strong>Conexão:</strong> ${data.connected ? 'Conectado' : 'Desconectado'}</span>
-        </div>`;
-
-        // Token válido
-        if (data.connected) {
-          html += `<div class="diagnostic-item">
-            <span class="icon">${data.token_expired ? '❌' : '✅'}</span>
-            <span><strong>Token:</strong> ${data.token_expired ? 'Expirado' : 'Válido'}</span>
-          </div>`;
-        }
-
-        // Testes de API
-        if (data.tests) {
-          html += '<hr style="margin: 1rem 0;"><h4 style="margin: 0.5rem 0;">Testes de API:</h4>';
-          
-          for (const [testName, testResult] of Object.entries(data.tests)) {
-            const passed = testResult.success === true;
-            html += `<div class="diagnostic-item">
-              <span class="icon">${passed ? '✅' : '❌'}</span>
-              <span><strong>${testName}:</strong> ${testResult.message || (passed ? 'OK' : 'Falhou')}</span>
-            </div>`;
-          }
-        }
-
-        // Permissões
-        if (data.scopes) {
-          html += '<hr style="margin: 1rem 0;"><h4 style="margin: 0.5rem 0;">Permissões do Token:</h4>';
-          html += `<div style="font-size: 0.85rem; color: var(--gray); margin-top: 0.5rem;">${data.scopes.join(', ') || 'Nenhuma'}</div>`;
-        }
-
-        // Recomendações
-        if (data.recommendations && data.recommendations.length > 0) {
-          html += '<hr style="margin: 1rem 0;"><h4 style="margin: 0.5rem 0;">Recomendações:</h4>';
-          data.recommendations.forEach(rec => {
-            html += `<div class="diagnostic-item">
-              <span class="icon">💡</span>
-              <span>${rec}</span>
-            </div>`;
-          });
-        }
-
-        html += '</div>';
-        resultsDiv.innerHTML = html;
-        
-      } catch (e) {
-        resultsDiv.innerHTML = `<div class="diagnostic-section"><p style="color: #dc2626;">❌ Erro: ${e.message}</p></div>`;
-        addLog(`Erro no diagnóstico: ${e.message}`, 'error');
-      }
-      
-      btn.disabled = false;
-      btn.textContent = 'Executar Diagnóstico';
-    }
-
     async function testAPI() {
       const itemId = document.getElementById('test-item-id').value.trim();
       const btn = document.getElementById('btn-test-api');
@@ -542,39 +447,6 @@
       btn.disabled = false;
     }
 
-    async function downloadDiagnosticReport() {
-      const btn = document.getElementById('btn-download-report');
-      const origText = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = 'Executando testes...';
-      addLog('Iniciando relatório de diagnóstico completo...');
-      try {
-        const res = await authFetch(`${API_BASE}/api/diagnostic-report`);
-        const text = await res.text();
-        if (!res.ok) {
-          addLog(`Erro ao gerar relatório: ${text.slice(0, 200)}`, 'error');
-          alert('Erro ao gerar relatório. Verifique os logs.');
-          return;
-        }
-        const blob = new Blob([text], { type: 'text/plain; charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `mercado-insights-diagnostico-${new Date().toISOString().slice(0,10)}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        addLog('Relatório baixado com sucesso. Anexe ao solicitar suporte.', 'success');
-      } catch (e) {
-        addLog(`Erro ao baixar relatório: ${e.message}`, 'error');
-        alert(`Erro: ${e.message}`);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = origText;
-      }
-    }
-
     async function init() {
       await initClerkAuth({ 
         signInContainerId: 'clerk-signin', 
@@ -593,8 +465,6 @@
       document.getElementById('btn-connect').addEventListener('click', connectML);
       document.getElementById('btn-disconnect').addEventListener('click', disconnectML);
       document.getElementById('btn-refresh-status').addEventListener('click', loadStatus);
-      document.getElementById('btn-diagnostic').addEventListener('click', runDiagnostic);
-      document.getElementById('btn-download-report').addEventListener('click', downloadDiagnosticReport);
       document.getElementById('btn-link-telegram-config')?.addEventListener('click', linkTelegramConfig);
       document.getElementById('btn-test-telegram')?.addEventListener('click', testTelegramMessage);
       document.getElementById('btn-test-api').addEventListener('click', testAPI);

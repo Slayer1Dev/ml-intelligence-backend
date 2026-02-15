@@ -28,6 +28,7 @@
         <a href="#" data-tab="metrics">Métricas</a>
         <a href="#" data-tab="users">Usuários</a>
         <a href="#" data-tab="subscriptions">Assinaturas</a>
+        <a href="#" data-tab="diagnostic">Diagnóstico</a>
         <a href="#" data-tab="logs">Logs</a>
         <a href="#" data-tab="audit">Logs IA</a>
       </nav>
@@ -55,6 +56,17 @@
         <div class="card">
           <h2 style="margin-bottom: 1rem;">Assinaturas</h2>
           <div id="subscriptions-list">Carregando…</div>
+        </div>
+      </div>
+
+      <div id="tab-diagnostic" class="tab-content" style="display:none;">
+        <div class="card">
+          <h2 style="margin-bottom: 0.5rem;">Diagnóstico Unificado</h2>
+          <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 1rem;">Executa os testes do backend e baixa o relatório completo (.txt).</p>
+          <div style="margin-bottom: 0.75rem;">
+            <button type="button" id="btn-run-diagnostic-report" class="button" style="font-size: 0.9rem;">Executar teste e baixar log (.txt)</button>
+          </div>
+          <pre id="diagnostic-content" style="background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; max-height: 60vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all; min-height: 120px;">Clique no botão para gerar o diagnóstico.</pre>
         </div>
       </div>
 
@@ -265,6 +277,43 @@
       }
     }
 
+    async function runDiagnosticReport() {
+      const btn = document.getElementById('btn-run-diagnostic-report');
+      const out = document.getElementById('diagnostic-content');
+      if (!btn || !out) return;
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Executando...';
+      out.textContent = 'Executando testes...';
+      out.style.color = '#e2e8f0';
+      try {
+        const res = await authFetch(`${API_BASE}/api/diagnostic-report`);
+        const text = await res.text();
+        if (!res.ok) {
+          out.textContent = text || 'Erro ao gerar diagnóstico.';
+          out.style.color = '#fca5a5';
+          return;
+        }
+
+        out.textContent = text;
+        const blob = new Blob([text], { type: 'text/plain; charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `mercado-insights-diagnostico-${new Date().toISOString().slice(0,10)}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        out.textContent = 'Erro ao gerar diagnóstico: ' + (e.message || String(e));
+        out.style.color = '#fca5a5';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    }
+
     function showTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
       document.querySelectorAll('.app-sidebar a[data-tab]').forEach(a => a.classList.remove('active'));
@@ -301,6 +350,7 @@
         });
       });
       document.getElementById('btn-refresh-logs')?.addEventListener('click', loadLogs);
+      document.getElementById('btn-run-diagnostic-report')?.addEventListener('click', runDiagnosticReport);
     }
 
     init();

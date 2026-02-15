@@ -9,9 +9,7 @@ from pydantic import BaseModel
 
 from app.auth import (
     admin_guard,
-    clerk_auth_guard,
     get_admin_emails,
-    get_auth_debug_snapshot,
     get_clerk_config,
     get_current_user,
     is_admin,
@@ -23,8 +21,6 @@ import json
 import logging
 import time
 import uuid
-import base64
-from urllib.parse import urlparse
 from pathlib import Path
 import aiofiles
 from typing import Dict, Any, Optional, List
@@ -608,120 +604,6 @@ def debug_admin(user: User = Depends(get_current_user)):
                 )
             )
         ),
-    }
-
-
-@app.get("/api/debug-auth-clerk")
-def debug_auth_clerk(
-    user: User = Depends(get_current_user),
-    request: Request = None,
-):
-    """Diagnóstico detalhado de autenticação Clerk para investigar email/admin."""
-    raw_auth = (request.headers.get("authorization", "") if request else "").strip()
-    raw_token = ""
-    if raw_auth.lower().startswith("bearer "):
-        raw_token = raw_auth[7:].strip()
-
-    unverified_claims = {}
-    token_parse_error = None
-    if raw_token:
-        try:
-            parts = raw_token.split(".")
-            if len(parts) >= 2:
-                payload = parts[1] + "=" * (-len(parts[1]) % 4)
-                decoded = base64.urlsafe_b64decode(payload.encode("utf-8")).decode("utf-8")
-                unverified_claims = json.loads(decoded)
-        except Exception as e:
-            token_parse_error = str(e)
-
-    data = get_auth_debug_snapshot(
-        credentials=None,
-        user_email=user.email,
-        clerk_user_id_override=user.clerk_user_id,
-    )
-    data["token_unverified_from_header"] = {
-        "has_authorization_header": bool(raw_auth),
-        "has_bearer_token": bool(raw_token),
-        "parse_error": token_parse_error,
-        "claims_keys": sorted(list(unverified_claims.keys())) if isinstance(unverified_claims, dict) else [],
-        "sub": unverified_claims.get("sub") if isinstance(unverified_claims, dict) else None,
-        "iss": unverified_claims.get("iss") if isinstance(unverified_claims, dict) else None,
-        "aud": unverified_claims.get("aud") if isinstance(unverified_claims, dict) else None,
-        "email_like_fields": {
-            "email": unverified_claims.get("email") if isinstance(unverified_claims, dict) else None,
-            "primary_email": unverified_claims.get("primary_email") if isinstance(unverified_claims, dict) else None,
-            "primaryEmail": unverified_claims.get("primaryEmail") if isinstance(unverified_claims, dict) else None,
-            "email_addresses_present": bool(unverified_claims.get("email_addresses")) if isinstance(unverified_claims, dict) else False,
-        },
-    }
-    data["db_user"] = {
-        "id": user.id,
-        "clerk_user_id": user.clerk_user_id,
-        "email": user.email,
-        "plan": user.plan,
-    }
-    return data
-
-
-@app.get("/api/debug-auth-public")
-def debug_auth_public(request: Request):
-    """Diagnóstico público (temporário) para investigar 403/Forbidden no auth do Clerk."""
-    raw_auth = (request.headers.get("authorization", "") or "").strip()
-    raw_token = ""
-    if raw_auth.lower().startswith("bearer "):
-        raw_token = raw_auth[7:].strip()
-
-    unverified_claims = {}
-    token_parse_error = None
-    if raw_token:
-        try:
-            parts = raw_token.split(".")
-            if len(parts) >= 2:
-                payload = parts[1] + "=" * (-len(parts[1]) % 4)
-                decoded = base64.urlsafe_b64decode(payload.encode("utf-8")).decode("utf-8")
-                unverified_claims = json.loads(decoded)
-        except Exception as e:
-            token_parse_error = str(e)
-
-    jwks_url = (os.getenv("CLERK_JWKS_URL") or "").strip()
-    frontend_api = (os.getenv("CLERK_FRONTEND_API") or "").strip()
-    expected_issuer = frontend_api.rstrip("/") if frontend_api else None
-    token_iss = unverified_claims.get("iss") if isinstance(unverified_claims, dict) else None
-
-    def _host(v: str | None):
-        if not v:
-            return None
-        try:
-            return urlparse(v).netloc or None
-        except Exception:
-            return None
-
-    return {
-        "env": {
-            "CLERK_JWKS_URL_set": bool(jwks_url),
-            "CLERK_FRONTEND_API_set": bool(frontend_api),
-            "CLERK_SECRET_KEY_set": bool((os.getenv("CLERK_SECRET_KEY") or "").strip()),
-            "jwks_host": _host(jwks_url),
-            "frontend_api_host": _host(frontend_api),
-            "expected_issuer": expected_issuer,
-        },
-        "token_unverified_from_header": {
-            "has_authorization_header": bool(raw_auth),
-            "has_bearer_token": bool(raw_token),
-            "parse_error": token_parse_error,
-            "claims_keys": sorted(list(unverified_claims.keys())) if isinstance(unverified_claims, dict) else [],
-            "sub": unverified_claims.get("sub") if isinstance(unverified_claims, dict) else None,
-            "iss": token_iss,
-            "aud": unverified_claims.get("aud") if isinstance(unverified_claims, dict) else None,
-            "email": unverified_claims.get("email") if isinstance(unverified_claims, dict) else None,
-            "primary_email": unverified_claims.get("primary_email") if isinstance(unverified_claims, dict) else None,
-            "primaryEmail": unverified_claims.get("primaryEmail") if isinstance(unverified_claims, dict) else None,
-        },
-        "hints": {
-            "issuer_matches_frontend_api": (token_iss == expected_issuer) if token_iss and expected_issuer else None,
-            "google_oauth_scope_related": False,
-            "note": "Se houver 403 aqui, geralmente e mismatch entre token do frontend e JWKS/instancia do Clerk no backend.",
-        },
     }
 
 

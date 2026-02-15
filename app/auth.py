@@ -159,66 +159,6 @@ def _fetch_clerk_user_info(clerk_user_id: str) -> dict:
         return {"ok": False, "status": None, "error": str(e), "email": None}
 
 
-def get_auth_debug_snapshot(
-    credentials: HTTPAuthorizationCredentials | None,
-    user_email: str | None = None,
-    clerk_user_id_override: str | None = None,
-) -> dict:
-    """Build detailed auth debug information for troubleshooting Clerk email/admin issues."""
-    claims = {}
-    decoded = getattr(credentials, "decoded", None) if credentials else None
-    if isinstance(decoded, dict):
-        claims = decoded
-
-    clerk_user_id = claims.get("sub") or clerk_user_id_override
-    email_from_claims = _extract_email_from_claims(claims) if claims else None
-    clerk_lookup = _fetch_clerk_user_info(clerk_user_id) if clerk_user_id else {"ok": False, "status": None, "error": "sub ausente", "email": None}
-
-    if email_from_claims:
-        resolved_email = email_from_claims
-        source = "jwt_claims"
-    elif clerk_lookup.get("email"):
-        resolved_email = clerk_lookup.get("email")
-        source = "clerk_backend_api"
-    else:
-        resolved_email = None
-        source = "none"
-
-    admin_list = _get_admin_emails()
-    normalized_user_email = (user_email or "").strip().lower()
-    return {
-        "env": {
-            "CLERK_JWKS_URL_set": bool(CLERK_JWKS_URL),
-            "CLERK_FRONTEND_API_set": bool(CLERK_FRONTEND_API),
-            "CLERK_PUBLISHABLE_KEY_set": bool(CLERK_PUBLISHABLE_KEY),
-            "CLERK_SECRET_KEY_set": bool(CLERK_SECRET_KEY),
-            "ADMIN_EMAILS_count": len(admin_list),
-        },
-        "token": {
-            "has_credentials": bool(credentials),
-            "has_decoded_claims": bool(claims),
-            "claims_keys": sorted(list(claims.keys())),
-            "sub": claims.get("sub"),
-            "iss": claims.get("iss"),
-            "aud": claims.get("aud"),
-            "azp": claims.get("azp"),
-            "sid": claims.get("sid"),
-            "exp": claims.get("exp"),
-            "nbf": claims.get("nbf"),
-            "iat": claims.get("iat"),
-            "email_from_claims": email_from_claims,
-        },
-        "clerk_api_lookup": clerk_lookup,
-        "resolution": {
-            "resolved_email": resolved_email,
-            "resolved_email_source": source,
-            "db_user_email": user_email,
-            "is_admin_for_db_email": normalized_user_email in admin_list if normalized_user_email else False,
-            "is_admin_for_resolved_email": (resolved_email or "").strip().lower() in admin_list if resolved_email else False,
-        },
-    }
-
-
 def get_admin_emails() -> List[str]:
     """Retorna a lista atual de e-mails admin (para diagnóstico)."""
     return _get_admin_emails()

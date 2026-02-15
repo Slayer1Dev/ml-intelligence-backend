@@ -84,7 +84,6 @@
       <div id="upgrade-cta" class="card" style="margin-top: 1rem; padding: 2rem; text-align: center; display: none;">
         <p style="color: var(--gray); margin-bottom: 0.5rem;">Assine o plano para desbloquear o Painel Financeiro, Meus Anúncios, Performance, Concorrentes e IA Assistente.</p>
         <button id="btn-assinar" class="btn btn-primary" style="margin-top: 1rem;">Assinar agora</button>
-        <p style="margin-top: 1rem; font-size: 0.85rem;"><a href="#" id="link-debug-admin">Debug: por que não sou admin?</a></p>
       </div>
 
       <div id="ml-cta" class="card" style="margin-top: 1rem; padding: 2rem; text-align: center;">
@@ -93,13 +92,6 @@
         <p id="ml-conectado" style="font-size: 0.9rem; color: var(--success, #0a0); display: none;">✓ Conta conectada</p>
       </div>
 
-      <div id="auth-debug-panel" class="card" style="margin-top: 1rem; padding: 1rem;">
-        <strong>Diagnóstico de autenticação (temporário)</strong>
-        <p style="margin-top: 0.5rem; color: var(--gray); font-size: 0.9rem;">Use para investigar por que o e-mail/admin está vazio.</p>
-        <button id="btn-run-auth-debug" class="btn btn-secondary" type="button" style="margin-top: 0.25rem;">Rodar teste de autenticação</button>
-        <button id="btn-copy-auth-debug" class="btn" type="button" style="margin-top: 0.25rem; margin-left: 0.5rem;">Copiar resultado</button>
-        <pre id="auth-debug-output" style="margin-top: 0.75rem; white-space: pre-wrap; background: #f7f9fc; padding: 0.75rem; border-radius: 8px; border: 1px solid #dce3ef; max-height: 360px; overflow: auto;">Clique em "Rodar teste de autenticação".</pre>
-      </div>
     </main>
   </div>
 
@@ -153,51 +145,6 @@
       if (!isPaid && !isAdmin) {
         document.getElementById('upgrade-cta').style.display = 'block';
         document.getElementById('btn-assinar').onclick = assinarPlano;
-        document.getElementById('link-debug-admin').onclick = async (e) => {
-          e.preventDefault();
-          try {
-            const res = await authFetch(API_BASE + '/api/debug-admin');
-            const d = await res.json();
-            alert('Seu email: ' + (d.seu_email || '(vazio)') + '\n\n' + d.dica);
-          } catch (err) {
-            alert('Erro: ' + (err.message || 'Não foi possível consultar'));
-          }
-        };
-      }
-    }
-
-    async function runAuthDiagnostic() {
-      const outputEl = document.getElementById('auth-debug-output');
-      if (!outputEl) return;
-      outputEl.textContent = 'Executando teste...';
-      try {
-        const res = await authFetch(API_BASE + '/api/debug-auth-clerk');
-        const data = await res.json();
-        if (!res.ok) {
-          if (res.status === 401 || res.status === 403) {
-            const fallbackRes = await authFetch(API_BASE + '/api/debug-auth-public');
-            const fallbackData = await fallbackRes.json().catch(() => ({}));
-            outputEl.textContent = 'Rota protegida falhou com HTTP ' + res.status + '.\\n\\n' +
-              'Diagnóstico público:\\n' + JSON.stringify(fallbackData, null, 2);
-            return;
-          }
-          outputEl.textContent = 'Erro HTTP ' + res.status + ':\\n' + JSON.stringify(data, null, 2);
-          return;
-        }
-        outputEl.textContent = JSON.stringify(data, null, 2);
-      } catch (e) {
-        outputEl.textContent = 'Erro ao rodar diagnóstico: ' + (e.message || 'desconhecido');
-      }
-    }
-
-    async function copyAuthDiagnostic() {
-      const outputEl = document.getElementById('auth-debug-output');
-      if (!outputEl) return;
-      try {
-        await navigator.clipboard.writeText(outputEl.textContent || '');
-        alert('Resultado copiado.');
-      } catch (_) {
-        alert('Não foi possível copiar automaticamente. Copie manualmente o texto abaixo.');
       }
     }
 
@@ -210,11 +157,6 @@
       if (!window.ClerkAuth?.signedIn) return;
 
       try {
-        const runBtn = document.getElementById('btn-run-auth-debug');
-        const copyBtn = document.getElementById('btn-copy-auth-debug');
-        if (runBtn) runBtn.onclick = runAuthDiagnostic;
-        if (copyBtn) copyBtn.onclick = copyAuthDiagnostic;
-
         const res = await authFetch(API_BASE + '/api/me');
         const me = await res.json();
         applyUserState(me);
